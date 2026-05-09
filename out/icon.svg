@@ -1,0 +1,39 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    @media (prefers-color-scheme: light) {
+      .background { fill: #2563eb; }
+      .foreground { fill: white; }
+    }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #3b82f6; }
+      .foreground { fill: white; }
+    }
+  </style>
+  <g clip-path="url(#clip0_7960_43945)">
+    <rect class="background" width="180" height="180" rx="37" />
+    <g class="foreground" transform="translate(35, 45)">
+      <!-- Truck Body -->
+      <rect x="20" y="40" width="60" height="35" rx="3" />
+      <!-- Truck Cab -->
+      <rect x="80" y="50" width="30" height="25" rx="3" />
+      <!-- Truck Window -->
+      <rect x="85" y="55" width="20" height="12" rx="2" fill="#2563eb" />
+      <!-- Wheels -->
+      <circle cx="40" cy="85" r="8" />
+      <circle cx="90" cy="85" r="8" />
+      <!-- Package/Cargo -->
+      <rect x="25" y="30" width="25" height="15" rx="2" />
+      <rect x="55" y="30" width="20" height="15" rx="2" />
+      <!-- Package details -->
+      <line x1="30" y1="37.5" x2="45" y2="37.5" stroke="#2563eb" stroke-width="2" />
+      <line x1="37.5" y1="32.5" x2="37.5" y2="42.5" stroke="#2563eb" stroke-width="2" />
+      <line x1="60" y1="37.5" x2="70" y2="37.5" stroke="#2563eb" stroke-width="2" />
+      <line x1="65" y1="32.5" x2="65" y2="42.5" stroke="#2563eb" stroke-width="2" />
+    </g>
+  </g>
+  <defs>
+    <clipPath id="clip0_7960_43945">
+      <rect width="180" height="180" fill="white" />
+    </clipPath>
+  </defs>
+</svg>
