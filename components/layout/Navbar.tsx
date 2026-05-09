@@ -52,12 +52,41 @@ export function Navbar() {
 
   return (
     <header className="
-      sticky top-0 z-40 h-16
-      bg-background/80 backdrop-blur-xl
-      border-b border-border/50
-      shadow-[0_1px_0_oklch(var(--primary)/0.08),0_4px_24px_rgb(0_0_0/0.15)]
-      transition-all duration-300
-    ">
+  sticky top-0 z-40 h-16
+  bg-background/80 backdrop-blur-xl
+
+  /* ── Border ── */
+  border-b border-sky-500/30
+  dark:border-sky-400/25
+
+  /* ── Light mode shadow ── */
+  shadow-[
+    0_1px_0_rgba(14,165,233,0.15),
+    0_4px_24px_rgba(14,165,233,0.08),
+    0_1px_3px_rgba(0,0,0,0.06)
+  ]
+
+  /* ── Dark mode: always-on blue glow (no hover needed) ── */
+  dark:shadow-[
+    0_1px_0_rgba(255,255,255,0.04),
+    0_1px_0_rgba(56,189,248,0.30),
+    0_4px_32px_rgba(14,165,233,0.28),
+    0_8px_64px_rgba(99,102,241,0.20),
+    0_16px_80px_rgba(14,165,233,0.12),
+    0_1px_3px_rgba(0,0,0,0.55)
+  ]
+
+  transition-all duration-300
+">
+      {/* Blue glow line — always visible in dark mode */}
+      <div className="
+    absolute bottom-0 inset-x-0 h-[1px] pointer-events-none
+    bg-gradient-to-r
+    from-transparent
+    via-sky-400/30
+    to-transparent
+    dark:via-sky-400/70
+  " />
       <div className="flex items-center justify-between h-full px-6">
 
         {/* ── Breadcrumb ── */}
@@ -93,7 +122,7 @@ export function Navbar() {
         </nav>
 
         {/* ── Demo Mode Badge ── */}
-        {APP_CONFIG.USE_MOCK && (
+        {/* {APP_CONFIG.USE_MOCK && (
           <div className="
             absolute left-1/2 -translate-x-1/2
             flex items-center gap-1.5
@@ -109,7 +138,7 @@ export function Navbar() {
               DEMO MODE
             </span>
           </div>
-        )}
+        )} */}
 
         {/* ── Right Actions ── */}
         <div className="flex items-center gap-1.5">
@@ -128,8 +157,8 @@ export function Navbar() {
                 bg-muted/40 border border-border
                 rounded-[10px] text-sm text-foreground
                 outline-none placeholder:text-muted-foreground
-                focus:border-primary/60 focus:bg-primary/5
-                focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.12)]
+                focus:border-sky-400/60 focus:bg-sky-500/5
+                focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)]
               "
             />
           </div>
@@ -144,9 +173,9 @@ export function Navbar() {
               rounded-[10px] cursor-pointer
               text-muted-foreground
               transition-all duration-200
-              hover:bg-primary/10 hover:border-primary/40
-              hover:text-primary hover:-translate-y-px
-              hover:shadow-[0_0_12px_oklch(var(--primary)/0.2)]
+              hover:bg-sky-500/10 hover:border-sky-400/40
+              hover:text-sky-400 hover:-translate-y-px
+              hover:shadow-[0_0_14px_rgba(14,165,233,0.25)]
             "
           >
             <Sun size={16} className="block dark:hidden" />
@@ -164,9 +193,9 @@ export function Navbar() {
                   rounded-[10px] cursor-pointer
                   text-muted-foreground
                   transition-all duration-200
-                  hover:bg-primary/10 hover:border-primary/40
-                  hover:text-primary hover:-translate-y-px
-                  hover:shadow-[0_0_12px_oklch(var(--primary)/0.2)]
+                  hover:bg-sky-500/10 hover:border-sky-400/40
+                  hover:text-sky-400 hover:-translate-y-px
+                  hover:shadow-[0_0_14px_rgba(14,165,233,0.25)]
                 "
               >
                 <Bell size={16} />
@@ -185,8 +214,6 @@ export function Navbar() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-80 nb-dropdown">
-
-              {/* Header */}
               <div className="flex items-center justify-between px-3 py-2">
                 <span className="nb-crumb-active text-[0.9rem]">
                   Notifications
@@ -275,25 +302,23 @@ export function Navbar() {
                   bg-muted/40 border border-border
                   rounded-xl cursor-pointer
                   transition-all duration-200
-                  hover:bg-primary/8 hover:border-primary/35
-                  hover:shadow-[0_0_16px_oklch(var(--primary)/0.15)]
+                  hover:bg-sky-500/8 hover:border-sky-400/35
+                  hover:shadow-[0_0_18px_rgba(14,165,233,0.18)]
                 "
               >
-                {/* Avatar */}
                 <div
                   className="
                     w-8 h-8 rounded-lg flex-shrink-0
                     flex items-center justify-center
                     text-white text-[0.8rem] font-bold font-display
                     overflow-hidden
-                    shadow-[0_0_10px_oklch(var(--primary)/0.3)]
+                    shadow-[0_0_12px_rgba(14,165,233,0.4)]
                   "
                   style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)' }}
                 >
                   {user?.avatar || (user?.name?.[0] ?? 'U')}
                 </div>
 
-                {/* Name + Role */}
                 <div className="hidden md:flex flex-col items-start">
                   <span className="
                     text-[0.85rem] font-bold font-display
@@ -303,7 +328,7 @@ export function Navbar() {
                   </span>
                   <span className="
                     text-[0.65rem] font-semibold
-                    text-primary tracking-[0.8px] uppercase
+                    text-sky-400 tracking-[0.8px] uppercase
                   ">
                     {user?.role}
                   </span>
@@ -312,8 +337,6 @@ export function Navbar() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56 nb-dropdown">
-
-              {/* User info header */}
               <div className="px-3 py-2.5">
                 <p className="text-[0.88rem] font-bold font-display text-foreground">
                   {user?.name}
@@ -357,7 +380,6 @@ export function Navbar() {
                 <LogOut size={14} className="opacity-80" />
                 Logout
               </DropdownMenuItem>
-
             </DropdownMenuContent>
           </DropdownMenu>
 

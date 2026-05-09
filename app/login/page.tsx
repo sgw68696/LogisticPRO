@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Truck, AlertCircle, Eye, EyeOff, Package, MapPin, BarChart3, Zap } from 'lucide-react';
 import MagneticButton from '@/components/layout/MagneticButton';
 import Image from 'next/image';
+import AnimatedLogo from '../Animatedlogo';
 const demoCredentials = [
   { role: 'Super Admin', username: 'superadmin', password: 'admin123' },
   { role: 'Ops Manager', username: 'ops_manager', password: 'ops123' },
@@ -244,24 +245,9 @@ export default function LoginPage() {
           }}
         >
           {/* LEFT PANEL */}
-          <div className="lp-left">
-            <div className="brand">
-              {/* <div className="brand-icon"> */}
-              {/* <Truck size={28} color="white" /> */}
-              <div className="relative flex h-16 w-16 items-center ">
-
-                {/* <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent" /> */}
-
-                <Image src="/logisticslogobg.png" alt="Logo" width={160} height={160}  />
-
-              </div>
-              {/* <Image src="/logisticslogobg.png" alt="Logo" width={160} height={160} className="mx-auto mb-6 drop-shadow-2xl" priority /> */}
-
-              {/* </div> */}
-              <div className="brand-text">
-                <h1>LogisticsPro</h1>
-                <p>Enterprise Logistics</p>
-              </div>
+          <div >
+            <div className="brand mb-4 flex">
+             <AnimatedLogo />
             </div>
 
             <p className="tagline">
@@ -284,7 +270,7 @@ export default function LoginPage() {
               ))}
             </div>
 
-            <div className="trust-row">
+            <div className="trust-row justify-center">
               <div className="trust-dot" />
               <span className="trust-text">All systems operational · v4.2.1</span>
             </div>
