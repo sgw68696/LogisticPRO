@@ -246,8 +246,9 @@ export default function LoginPage() {
         >
           {/* LEFT PANEL */}
           <div >
-            <div className="brand mb-4 flex">
-             <AnimatedLogo />
+            <div className="brand mb-4 flex items-center justify-center">
+              {/* <AnimatedLogo /> */}
+              <Image src="/LogisticsProLogo.png" alt="Logo" width={220} height={220} className='bg-white bg-opacity-20 rounded-lg' />
             </div>
 
             <p className="tagline">

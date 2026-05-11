@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AnimatedLogo2 from '../../app/Animatedlogo2';
+import Image from 'next/image';
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -85,13 +86,20 @@ export function Sidebar() {
               collapsed ? "justify-center" : "gap-3"
             )}
           >
-            <div
+            {/* <div
               className={cn(
                 "flex items-center justify-center flex-shrink-0 transition-all duration-300",
                 collapsed ? "w-10 h-10" : "w-12 h-12"
               )}
             >
               <AnimatedLogo2 />
+            </div> */}
+
+            
+
+            <div className="brand mb-4 flex items-center justify-center">
+              {/* <AnimatedLogo /> */}
+              <Image src="/LogisticsProLogo-bg.png" alt="Logo" width={100} height={100} className='bg-white bg-opacity-20 rounded-lg' />
             </div>
 
             <div
@@ -106,9 +114,9 @@ export function Sidebar() {
                 className="text-[1.02rem] font-extrabold text-[#f0f9ff] tracking-tight whitespace-nowrap"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
-                Logistics<span className="text-[#38bdf8]">Pro</span>
+                Logistics<span className="text-[#90EE90]">Pro</span>
               </span>
-              <span className="text-[0.58rem] text-[#38bdf8] uppercase tracking-[1.8px] font-medium whitespace-nowrap">
+              <span className="text-[0.58rem] text-[#90EE90] uppercase tracking-[1.8px] font-medium whitespace-nowrap">
                 Enterprise
               </span>
             </div>
