@@ -100,6 +100,277 @@ export interface TransportItem {
   createdAt: string;
 }
 
+// ============================================
+// LAND TRANSPORT MODELS
+// ============================================
+export interface Vehicle {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  categoryId: string;
+  registrationNumber: string;
+  chassisNumber: string;
+  engineNumber: string;
+  make: string;
+  model: string;
+  year: number;
+  color: string;
+  fuelType: 'Petrol' | 'Diesel' | 'CNG' | 'Electric';
+  capacity: number;
+  capacityUnit: 'kg' | 'liters' | 'cubic_meters';
+  status: VehicleStatus;
+  owner: string;
+  insuranceNumber: string;
+  insuranceExpiry: string;
+  pollutionCertificate: string;
+  pollutionExpiry: string;
+  maintenanceSchedule: MaintenanceRecord[];
+  fuelLog: FuelRecord[];
+  currentDriver: string | null;
+  totalDistance: number;
+  lastServiceDate: string;
+  nextServiceDue: string;
+  purchaseDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaintenanceRecord {
+  id: string;
+  vehicleId: string;
+  date: string;
+  type: 'Regular' | 'Repair' | 'Emergency';
+  description: string;
+  cost: number;
+  nextDueDate: string;
+  performedBy: string;
+}
+
+export interface FuelRecord {
+  id: string;
+  vehicleId: string;
+  date: string;
+  quantity: number;
+  cost: number;
+  odometer: number;
+  fuelType: string;
+  location: string;
+}
+
+// ============================================
+// AIR TRANSPORT MODELS
+// ============================================
+export interface Aircraft {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  categoryId: string;
+  registrationNumber: string;
+  manufacturer: string;
+  model: string;
+  manufactureYear: number;
+  serialNumber: string;
+  capacity: number;
+  capacityUnit: 'kg' | 'cubic_meters';
+  maxFlightHours: number;
+  currentFlightHours: number;
+  maxAltitude: number;
+  cruiseSpeed: number;
+  range: number;
+  fuelCapacity: number;
+  status: 'Available' | 'On Route' | 'Maintenance' | 'Grounded';
+  airworthinessExpiry: string;
+  maintenanceLog: AircraftMaintenance[];
+  lastInspection: string;
+  nextInspectionDue: string;
+  crew: {
+    pilotId: string;
+    copilotId: string;
+    engineerIds: string[];
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AircraftMaintenance {
+  id: string;
+  aircraftId: string;
+  date: string;
+  type: 'Routine' | 'Major' | 'Emergency';
+  description: string;
+  flightHoursBefore: number;
+  flightHoursAfter: number;
+  cost: number;
+  certifiedBy: string;
+}
+
+// ============================================
+// WATER TRANSPORT MODELS
+// ============================================
+export interface Ship {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  categoryId: string;
+  vesselName: string;
+  imoNumber: string;
+  callSign: string;
+  flag: string; // Country of registry
+  shipBuilder: string;
+  yearBuilt: number;
+  grossTonnage: number;
+  netTonnage: number;
+  deadWeightTonnage: number;
+  length: number;
+  breadth: number;
+  depth: number;
+  draughtDepth: number;
+  containerCapacity: number; // For container ships
+  cargoHoldCapacity: number;
+  fuelCapacity: number;
+  freshWaterCapacity: number;
+  speed: number; // knots
+  mainEngine: string;
+  auxiliaryEngines: number;
+  class: string; // Ship classification
+  certification: string;
+  certificationExpiry: string;
+  lastDryDock: string;
+  nextDryDockDue: string;
+  crewSize: number;
+  status: 'Active' | 'Inactive' | 'Maintenance' | 'Docked' | 'Decommissioned';
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+    port: string;
+  };
+  crewList: ShipCrew[];
+  maintenanceRecords: ShipMaintenance[];
+  certifications: ShipCertification[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShipCrew {
+  id: string;
+  shipId: string;
+  crewMemberId: string;
+  designation: 'Captain' | 'Chief Officer' | 'Engineer' | 'Cook' | 'Sailor' | 'Other';
+  joinDate: string;
+  leaveDate: string | null;
+}
+
+export interface ShipMaintenance {
+  id: string;
+  shipId: string;
+  date: string;
+  type: 'Routine' | 'Repair' | 'Emergency';
+  description: string;
+  location: string;
+  cost: number;
+  duration: number; // in days
+  doneBy: string; // Shipyard/contractor name
+}
+
+export interface ShipCertification {
+  id: string;
+  shipId: string;
+  type: string; // SOLAS, MARPOL, etc.
+  issuedDate: string;
+  expiryDate: string;
+  issuedBy: string;
+}
+
+export interface Cargo {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  cargoNumber: string;
+  description: string;
+  weight: number;
+  weightUnit: 'kg' | 'tons' | 'lbs';
+  volume: number;
+  volumeUnit: 'cubic_meters' | 'cubic_feet';
+  type: 'General' | 'Hazmat' | 'Perishable' | 'Fragile' | 'Temperature Controlled';
+  packageCount: number;
+  contents: CargoItem[];
+  shipper: {
+    name: string;
+    address: string;
+    contact: string;
+  };
+  consignee: {
+    name: string;
+    address: string;
+    contact: string;
+  };
+  transportMode: 'Land' | 'Air' | 'Water';
+  shipmentRoute: ShipmentLeg[];
+  status: 'Pending' | 'Loaded' | 'In Transit' | 'Delivered' | 'Damaged' | 'Lost';
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+    lastUpdate: string;
+  } | null;
+  insuranceAmount: number;
+  insuranceProvider: string;
+  inspectionRecords: CargoInspection[];
+  temperatureLog: TemperatureLog[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CargoItem {
+  id: string;
+  cargoId: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  weight: number;
+  hsCode: string;
+  hazmatClass: string | null;
+  estimatedValue: number;
+}
+
+export interface ShipmentLeg {
+  id: string;
+  cargoId: string;
+  legNumber: number;
+  origin: string;
+  destination: string;
+  transportType: 'Land' | 'Air' | 'Water';
+  vehicleId: string | null;
+  aircraftId: string | null;
+  shipId: string | null;
+  driverId: string | null;
+  departureDate: string;
+  estimatedArrival: string;
+  actualArrival: string | null;
+  status: 'Scheduled' | 'In Transit' | 'Completed' | 'Delayed' | 'Cancelled';
+}
+
+export interface CargoInspection {
+  id: string;
+  cargoId: string;
+  date: string;
+  inspectionType: 'Pre-Shipment' | 'During Transit' | 'Post-Delivery';
+  inspectedBy: string;
+  findings: string;
+  damageFound: boolean;
+  damageDetails: string | null;
+  photos: string[];
+  passed: boolean;
+}
+
+export interface TemperatureLog {
+  id: string;
+  cargoId: string;
+  timestamp: string;
+  temperature: number;
+  humidity: number;
+  location: string;
+}
+
 export interface Agent {
   id: string;
   companyId: string;
@@ -720,21 +991,301 @@ export const mockOrders: Order[] = Array.from({ length: 25 }, (_, i) => {
 
 // MOCK VEHICLES (15+ vehicles)
 export const mockVehicles: Vehicle[] = [
-  { id: 'veh-001', vehicleId: 'VEH-001', type: 'Truck', licensePlate: 'MH 12 AB 1234', model: 'Tata 407', capacity: '3000 kg', status: 'Available', assignedDriver: 'drv-001', currentLocation: 'Mumbai Warehouse', maintenanceHistory: [{ date: '2024-12-15', description: 'Oil change and brake check', cost: 5000 }], fuelLogs: [{ date: '2025-01-14', liters: 80, cost: 7200 }] },
-  { id: 'veh-002', vehicleId: 'VEH-002', type: 'Van', licensePlate: 'DL 01 CD 5678', model: 'Mahindra Supro', capacity: '1000 kg', status: 'On Route', assignedDriver: 'drv-002', currentLocation: 'En route to Delhi', maintenanceHistory: [{ date: '2024-11-20', description: 'Tire replacement', cost: 12000 }], fuelLogs: [{ date: '2025-01-15', liters: 45, cost: 4050 }] },
-  { id: 'veh-003', vehicleId: 'VEH-003', type: 'Bike', licensePlate: 'KA 05 EF 9012', model: 'TVS Apache RTR', capacity: '20 kg', status: 'Available', assignedDriver: 'drv-003', currentLocation: 'Bangalore Hub', maintenanceHistory: [{ date: '2025-01-05', description: 'Chain lubrication', cost: 500 }], fuelLogs: [{ date: '2025-01-15', liters: 8, cost: 800 }] },
-  { id: 'veh-004', vehicleId: 'VEH-004', type: 'Tempo', licensePlate: 'TN 07 GH 3456', model: 'Ashok Leyland Dost', capacity: '1500 kg', status: 'Maintenance', assignedDriver: null, currentLocation: 'Chennai Workshop', maintenanceHistory: [{ date: '2025-01-10', description: 'Engine overhaul', cost: 25000 }], fuelLogs: [{ date: '2025-01-08', liters: 55, cost: 4950 }] },
-  { id: 'veh-005', vehicleId: 'VEH-005', type: 'Truck', licensePlate: 'GJ 01 IJ 7890', model: 'Eicher Pro 1059', capacity: '5000 kg', status: 'On Route', assignedDriver: 'drv-004', currentLocation: 'Highway - Ahmedabad to Mumbai', maintenanceHistory: [{ date: '2024-10-25', description: 'Full service', cost: 15000 }], fuelLogs: [{ date: '2025-01-15', liters: 120, cost: 10800 }] },
-  { id: 'veh-006', vehicleId: 'VEH-006', type: 'Van', licensePlate: 'AP 09 KL 2345', model: 'Force Traveller', capacity: '1200 kg', status: 'Available', assignedDriver: 'drv-005', currentLocation: 'Hyderabad Depot', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-14', liters: 50, cost: 4500 }] },
-  { id: 'veh-007', vehicleId: 'VEH-007', type: 'Bike', licensePlate: 'MH 04 MN 6789', model: 'Honda Shine', capacity: '15 kg', status: 'Available', assignedDriver: 'drv-006', currentLocation: 'Pune Office', maintenanceHistory: [{ date: '2024-12-01', description: 'Battery replacement', cost: 3000 }], fuelLogs: [{ date: '2025-01-15', liters: 6, cost: 600 }] },
-  { id: 'veh-008', vehicleId: 'VEH-008', type: 'Truck', licensePlate: 'RJ 14 OP 1234', model: 'BharatBenz 1217C', capacity: '7000 kg', status: 'Inactive', assignedDriver: null, currentLocation: 'Jaipur Yard', maintenanceHistory: [{ date: '2024-09-15', description: 'Major repair needed', cost: 50000 }], fuelLogs: [] },
-  { id: 'veh-009', vehicleId: 'VEH-009', type: 'Tempo', licensePlate: 'WB 02 QR 5678', model: 'Tata Ace Gold', capacity: '750 kg', status: 'On Route', assignedDriver: 'drv-007', currentLocation: 'Kolkata to Howrah', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-15', liters: 25, cost: 2250 }] },
-  { id: 'veh-010', vehicleId: 'VEH-010', type: 'Van', licensePlate: 'MP 09 ST 9012', model: 'Maruti Eeco Cargo', capacity: '600 kg', status: 'Available', assignedDriver: 'drv-008', currentLocation: 'Indore Hub', maintenanceHistory: [{ date: '2025-01-02', description: 'AC repair', cost: 8000 }], fuelLogs: [{ date: '2025-01-14', liters: 35, cost: 3150 }] },
-  { id: 'veh-011', vehicleId: 'VEH-011', type: 'Truck', licensePlate: 'KA 01 UV 3456', model: 'Tata Prima', capacity: '10000 kg', status: 'On Route', assignedDriver: 'drv-009', currentLocation: 'Bangalore to Chennai Highway', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-15', liters: 150, cost: 13500 }] },
-  { id: 'veh-012', vehicleId: 'VEH-012', type: 'Bike', licensePlate: 'DL 08 WX 7890', model: 'Bajaj Pulsar', capacity: '25 kg', status: 'Maintenance', assignedDriver: null, currentLocation: 'Delhi Service Center', maintenanceHistory: [{ date: '2025-01-12', description: 'Engine tune-up', cost: 2000 }], fuelLogs: [] },
-  { id: 'veh-013', vehicleId: 'VEH-013', type: 'Tempo', licensePlate: 'MH 14 YZ 2345', model: 'Mahindra Bolero Pickup', capacity: '1100 kg', status: 'Available', assignedDriver: 'drv-010', currentLocation: 'Pune Warehouse', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-14', liters: 40, cost: 3600 }] },
-  { id: 'veh-014', vehicleId: 'VEH-014', type: 'Van', licensePlate: 'TN 01 AB 6789', model: 'Tata Winger', capacity: '1500 kg', status: 'On Route', assignedDriver: 'drv-011', currentLocation: 'Chennai to Coimbatore', maintenanceHistory: [{ date: '2024-11-10', description: 'Suspension check', cost: 6000 }], fuelLogs: [{ date: '2025-01-15', liters: 60, cost: 5400 }] },
-  { id: 'veh-015', vehicleId: 'VEH-015', type: 'Truck', licensePlate: 'GJ 05 CD 1234', model: 'Ashok Leyland Ecomet', capacity: '8000 kg', status: 'Available', assignedDriver: 'drv-012', currentLocation: 'Ahmedabad Depot', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-13', liters: 100, cost: 9000 }] },
+  {
+    id: 'veh-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'tc-001',
+    registrationNumber: 'MH 12 AB 1234',
+    chassisNumber: 'TATA123456789ABC',
+    engineNumber: 'TEM789123456',
+    make: 'Tata',
+    model: '407',
+    year: 2020,
+    color: 'White',
+    fuelType: 'Diesel',
+    capacity: 3000,
+    capacityUnit: 'kg',
+    status: 'Available',
+    owner: 'TechLogistics India',
+    insuranceNumber: 'INS123456',
+    insuranceExpiry: '2025-12-31',
+    pollutionCertificate: 'PC789456',
+    pollutionExpiry: '2025-06-30',
+    maintenanceSchedule: [
+      { id: 'mtn-001', vehicleId: 'veh-001', date: '2024-12-15', type: 'Regular', description: 'Oil change and brake check', cost: 5000, nextDueDate: '2025-03-15', performedBy: 'Workshop A' }
+    ],
+    fuelLog: [
+      { id: 'fl-001', vehicleId: 'veh-001', date: '2025-01-14', quantity: 80, cost: 7200, odometer: 145000, fuelType: 'Diesel', location: 'Mumbai Fuel Station' }
+    ],
+    currentDriver: 'drv-001',
+    totalDistance: 145000,
+    lastServiceDate: '2024-12-15',
+    nextServiceDue: '2025-03-15',
+    purchaseDate: '2020-06-10',
+    createdAt: '2020-06-10',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'veh-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    categoryId: 'tc-001',
+    registrationNumber: 'DL 01 CD 5678',
+    chassisNumber: 'MAHIND234567890',
+    engineNumber: 'MEG456789012',
+    make: 'Mahindra',
+    model: 'Supro',
+    year: 2019,
+    color: 'Blue',
+    fuelType: 'Diesel',
+    capacity: 1000,
+    capacityUnit: 'kg',
+    status: 'On Route',
+    owner: 'TechLogistics India',
+    insuranceNumber: 'INS654321',
+    insuranceExpiry: '2025-11-15',
+    pollutionCertificate: 'PC123789',
+    pollutionExpiry: '2025-05-15',
+    maintenanceSchedule: [
+      { id: 'mtn-002', vehicleId: 'veh-002', date: '2024-11-20', type: 'Repair', description: 'Tire replacement', cost: 12000, nextDueDate: '2025-05-20', performedBy: 'TireFix Center' }
+    ],
+    fuelLog: [
+      { id: 'fl-002', vehicleId: 'veh-002', date: '2025-01-15', quantity: 45, cost: 4050, odometer: 98765, fuelType: 'Diesel', location: 'Delhi Fuel Station' }
+    ],
+    currentDriver: 'drv-002',
+    totalDistance: 98765,
+    lastServiceDate: '2024-11-20',
+    nextServiceDue: '2025-05-20',
+    purchaseDate: '2019-03-22',
+    createdAt: '2019-03-22',
+    updatedAt: '2025-01-15'
+  },
+];
+
+// MOCK AIRCRAFT (4 aircraft)
+export const mockAircraft: Aircraft[] = [
+  {
+    id: 'air-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'ac-001',
+    registrationNumber: 'VT-ABC',
+    manufacturer: 'Boeing',
+    model: '737 Freighter',
+    manufactureYear: 2015,
+    serialNumber: 'BB737F001',
+    capacity: 25000,
+    capacityUnit: 'kg',
+    maxFlightHours: 75000,
+    currentFlightHours: 45230,
+    maxAltitude: 43000,
+    cruiseSpeed: 500,
+    range: 5400,
+    fuelCapacity: 26730,
+    status: 'Available',
+    airworthinessExpiry: '2025-12-31',
+    maintenanceLog: [
+      { id: 'am-001', aircraftId: 'air-001', date: '2024-11-15', type: 'Routine', description: 'Pre-flight inspection', flightHoursBefore: 45200, flightHoursAfter: 45230, cost: 50000, certifiedBy: 'CAA Inspector' }
+    ],
+    lastInspection: '2024-11-15',
+    nextInspectionDue: '2025-05-15',
+    crew: { pilotId: 'crew-001', copilotId: 'crew-002', engineerIds: ['crew-003'] },
+    createdAt: '2015-06-15',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'air-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'ac-001',
+    registrationNumber: 'VT-XYZ',
+    manufacturer: 'Airbus',
+    model: 'A330 Freighter',
+    manufactureYear: 2018,
+    serialNumber: 'AA330F002',
+    capacity: 65000,
+    capacityUnit: 'kg',
+    maxFlightHours: 90000,
+    currentFlightHours: 32500,
+    maxAltitude: 43000,
+    cruiseSpeed: 475,
+    range: 7400,
+    fuelCapacity: 139090,
+    status: 'Maintenance',
+    airworthinessExpiry: '2026-06-30',
+    maintenanceLog: [
+      { id: 'am-002', aircraftId: 'air-002', date: '2025-01-10', type: 'Major', description: 'Engine overhaul', flightHoursBefore: 32500, flightHoursAfter: 32500, cost: 500000, certifiedBy: 'Airbus Service Center' }
+    ],
+    lastInspection: '2025-01-10',
+    nextInspectionDue: '2025-07-10',
+    crew: { pilotId: 'crew-004', copilotId: 'crew-005', engineerIds: ['crew-006', 'crew-007'] },
+    createdAt: '2018-09-20',
+    updatedAt: '2025-01-10'
+  }
+];
+
+// MOCK SHIPS (3 ships)
+export const mockShips: Ship[] = [
+  {
+    id: 'ship-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'sc-001',
+    vesselName: 'TechCargo Express',
+    imoNumber: '9876543',
+    callSign: 'TCEX',
+    flag: 'India',
+    shipBuilder: 'Cochin Shipyard',
+    yearBuilt: 2015,
+    grossTonnage: 50000,
+    netTonnage: 35000,
+    deadWeightTonnage: 65000,
+    length: 225,
+    breadth: 32,
+    depth: 18,
+    draughtDepth: 10.5,
+    containerCapacity: 3500,
+    cargoHoldCapacity: 75000,
+    fuelCapacity: 3500,
+    freshWaterCapacity: 350,
+    speed: 22,
+    mainEngine: 'MAN B&W 6S70ME-C',
+    auxiliaryEngines: 3,
+    class: 'Lloyd Register',
+    certification: 'SOLAS, MARPOL',
+    certificationExpiry: '2026-12-31',
+    lastDryDock: '2023-06-15',
+    nextDryDockDue: '2026-06-15',
+    crewSize: 25,
+    status: 'Active',
+    currentLocation: { latitude: 19.0760, longitude: 72.8777, port: 'Mumbai Port' },
+    crewList: [
+      { id: 'crew-s001', shipId: 'ship-001', crewMemberId: 'crew-010', designation: 'Captain', joinDate: '2019-01-15', leaveDate: null },
+      { id: 'crew-s002', shipId: 'ship-001', crewMemberId: 'crew-011', designation: 'Chief Officer', joinDate: '2020-06-20', leaveDate: null }
+    ],
+    maintenanceRecords: [
+      { id: 'sm-001', shipId: 'ship-001', date: '2024-12-01', type: 'Routine', description: 'Hull inspection and maintenance', location: 'Mumbai Dry Dock', cost: 250000, duration: 5, doneBy: 'Mumbai Shipyard' }
+    ],
+    certifications: [
+      { id: 'sc-001', shipId: 'ship-001', type: 'SOLAS', issuedDate: '2023-01-15', expiryDate: '2026-12-31', issuedBy: 'Lloyd Register' },
+      { id: 'sc-002', shipId: 'ship-001', type: 'MARPOL', issuedDate: '2023-01-15', expiryDate: '2026-12-31', issuedBy: 'Lloyd Register' }
+    ],
+    createdAt: '2015-06-20',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'ship-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    categoryId: 'sc-001',
+    vesselName: 'IndianOcean Carrier',
+    imoNumber: '8765432',
+    callSign: 'IOC',
+    flag: 'Singapore',
+    shipBuilder: 'Hyundai Heavy Industries',
+    yearBuilt: 2018,
+    grossTonnage: 120000,
+    netTonnage: 80000,
+    deadWeightTonnage: 155000,
+    length: 320,
+    breadth: 44,
+    depth: 25,
+    draughtDepth: 13.5,
+    containerCapacity: 10000,
+    cargoHoldCapacity: 185000,
+    fuelCapacity: 5000,
+    freshWaterCapacity: 500,
+    speed: 19.5,
+    mainEngine: 'MAN B&W 8S90ME-C',
+    auxiliaryEngines: 4,
+    class: 'ABS',
+    certification: 'SOLAS, MARPOL, ISM',
+    certificationExpiry: '2027-06-30',
+    lastDryDock: '2022-03-10',
+    nextDryDockDue: '2025-03-10',
+    crewSize: 35,
+    status: 'Active',
+    currentLocation: { latitude: 12.9716, longitude: 77.5946, port: 'Singapore Port' },
+    crewList: [],
+    maintenanceRecords: [],
+    certifications: [],
+    createdAt: '2018-09-15',
+    updatedAt: '2025-01-15'
+  }
+];
+
+// MOCK CARGO (5 cargo shipments)
+export const mockCargo: Cargo[] = [
+  {
+    id: 'cargo-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    cargoNumber: 'CARGO-2025-001',
+    description: 'Electronics Export - Container',
+    weight: 15000,
+    weightUnit: 'kg',
+    volume: 25,
+    volumeUnit: 'cubic_meters',
+    type: 'General',
+    packageCount: 250,
+    contents: [
+      { id: 'ci-001', cargoId: 'cargo-001', description: 'Laptop Computers', quantity: 100, unit: 'units', weight: 10000, hsCode: '8471.30', hazmatClass: null, estimatedValue: 3000000 },
+      { id: 'ci-002', cargoId: 'cargo-001', description: 'Mobile Devices', quantity: 150, unit: 'units', weight: 5000, hsCode: '8517.62', hazmatClass: null, estimatedValue: 2000000 }
+    ],
+    shipper: { name: 'Tech Exports Ltd', address: 'Bangalore, India', contact: '+91 9876543210' },
+    consignee: { name: 'Global Tech Imports', address: 'Singapore', contact: '+65 98765432' },
+    transportMode: 'Water',
+    shipmentRoute: [
+      { id: 'leg-001', cargoId: 'cargo-001', legNumber: 1, origin: 'Bangalore', destination: 'Mumbai Port', transportType: 'Land', vehicleId: 'veh-001', aircraftId: null, shipId: null, driverId: 'drv-001', departureDate: '2025-01-10', estimatedArrival: '2025-01-12', actualArrival: '2025-01-12', status: 'Completed' },
+      { id: 'leg-002', cargoId: 'cargo-001', legNumber: 2, origin: 'Mumbai Port', destination: 'Singapore Port', transportType: 'Water', vehicleId: null, aircraftId: null, shipId: 'ship-001', driverId: null, departureDate: '2025-01-13', estimatedArrival: '2025-01-28', actualArrival: null, status: 'In Transit' }
+    ],
+    status: 'In Transit',
+    currentLocation: { latitude: 4.1748, longitude: 101.6964, lastUpdate: '2025-01-14T10:30:00Z' },
+    insuranceAmount: 5000000,
+    insuranceProvider: 'Global Insurance Corp',
+    inspectionRecords: [
+      { id: 'insp-001', cargoId: 'cargo-001', date: '2025-01-10', inspectionType: 'Pre-Shipment', inspectedBy: 'Inspector A', findings: 'All goods in good condition', damageFound: false, damageDetails: null, photos: [], passed: true }
+    ],
+    temperatureLog: [
+      { id: 'tl-001', cargoId: 'cargo-001', timestamp: '2025-01-14T10:00:00Z', temperature: 22, humidity: 45, location: 'Ship Container' }
+    ],
+    createdAt: '2025-01-10',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'cargo-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    cargoNumber: 'CARGO-2025-002',
+    description: 'Pharmaceutical Shipment - Temperature Controlled',
+    weight: 2500,
+    weightUnit: 'kg',
+    volume: 8,
+    volumeUnit: 'cubic_meters',
+    type: 'Temperature Controlled',
+    packageCount: 50,
+    contents: [
+      { id: 'ci-003', cargoId: 'cargo-002', description: 'Medicine Boxes', quantity: 50, unit: 'boxes', weight: 2500, hsCode: '3004.90', hazmatClass: null, estimatedValue: 500000 }
+    ],
+    shipper: { name: 'Pharma Industries Ltd', address: 'Hyderabad, India', contact: '+91 8765432109' },
+    consignee: { name: 'Medical Supplies Co', address: 'Dubai', contact: '+971 123456789' },
+    transportMode: 'Air',
+    shipmentRoute: [
+      { id: 'leg-003', cargoId: 'cargo-002', legNumber: 1, origin: 'Hyderabad', destination: 'Bangalore Airport', transportType: 'Land', vehicleId: 'veh-002', aircraftId: null, shipId: null, driverId: 'drv-002', departureDate: '2025-01-12', estimatedArrival: '2025-01-12', actualArrival: '2025-01-12', status: 'Completed' },
+      { id: 'leg-004', cargoId: 'cargo-002', legNumber: 2, origin: 'Bangalore Airport', destination: 'Dubai Airport', transportType: 'Air', vehicleId: null, aircraftId: 'air-001', shipId: null, driverId: null, departureDate: '2025-01-13', estimatedArrival: '2025-01-14', actualArrival: null, status: 'In Transit' }
+    ],
+    status: 'In Transit',
+    currentLocation: { latitude: 29.4454, longitude: 65.5031, lastUpdate: '2025-01-14T15:45:00Z' },
+    insuranceAmount: 600000,
+    insuranceProvider: 'AirCargo Insurance',
+    inspectionRecords: [],
+    temperatureLog: [
+      { id: 'tl-002', cargoId: 'cargo-002', timestamp: '2025-01-14T15:00:00Z', temperature: 2, humidity: 35, location: 'Air Container' }
+    ],
+    createdAt: '2025-01-12',
+    updatedAt: '2025-01-14'
+  }
 ];
 
 // MOCK DRIVERS (20+ drivers)
