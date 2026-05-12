@@ -1,13 +1,408 @@
 // MOCK DATA FOR LOGISTICS MANAGEMENT SYSTEM
 
-// Types
+// MULTI-TENANCY & ENTERPRISE TYPES
+export type CompanyStatus = 'Active' | 'Pending' | 'Suspended' | 'Inactive';
+export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
+export type UserRole = 'SuperAdmin' | 'CompanyAdmin' | 'Manager' | 'Dispatcher' | 'Agent' | 'Staff' | 'Operator' | 'Admin';
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+
+// LOGISTICS OPERATION TYPES
 export type ShipmentStatus = 'Pending' | 'Picked Up' | 'In Transit' | 'Out for Delivery' | 'Delivered' | 'Cancelled' | 'Failed';
 export type OrderStatus = 'Draft' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Returned';
 export type PaymentStatus = 'Pending' | 'Paid' | 'Partial' | 'Refunded';
 export type VehicleStatus = 'Available' | 'On Route' | 'Maintenance' | 'Inactive';
 export type DriverStatus = 'Active' | 'On Duty' | 'Off Duty' | 'Suspended';
 export type InvoiceStatus = 'Unpaid' | 'Paid' | 'Overdue' | 'Cancelled';
-export type UserRole = 'Admin' | 'Manager' | 'Dispatcher' | 'Staff';
+
+// MULTI-TENANCY INTERFACES
+export interface Company {
+  id: string;
+  name: string;
+  registrationType: 'self-service' | 'admin-created';
+  registrationStatus: RegistrationStatus;
+  status: CompanyStatus;
+  email: string;
+  phone: string;
+  registeredAddress: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  taxId: string;
+  businessType: 'Freight' | 'Express' | 'Courier' | 'Logistics' | 'Mixed';
+  registrationDate: string;
+  approvalDate: string | null;
+  approvedBy: string | null; // SuperAdmin user ID
+  logo: string | null;
+  website: string | null;
+  contactPerson: string;
+  contactPhone: string;
+  maxOrganizations: number;
+  maxAgents: number;
+  currentOrganizations: number;
+  currentAgents: number;
+  billingCycle: 'Monthly' | 'Quarterly' | 'Yearly';
+  plan: 'Starter' | 'Professional' | 'Enterprise';
+  documents: { type: string; url: string; verified: boolean; uploadedAt: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Organization {
+  id: string;
+  companyId: string;
+  name: string;
+  type: 'Regional' | 'Department' | 'Branch' | 'Division';
+  status: CompanyStatus;
+  parentOrganizationId: string | null;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  managerId: string;
+  agentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransportType {
+  id: string;
+  companyId: string;
+  name: 'Land' | 'Air' | 'Water';
+  status: 'Active' | 'Inactive';
+  createdAt: string;
+}
+
+export interface TransportCategory {
+  id: string;
+  companyId: string;
+  transportTypeId: string;
+  name: string;
+  description: string;
+  specifications: Record<string, string | number | boolean>;
+  capacity: number;
+  capacityUnit: 'kg' | 'cubic_meters' | 'tons' | 'units';
+  maxSpeed: number | null;
+  fuelType: string | null;
+  createdAt: string;
+}
+
+export interface TransportItem {
+  id: string;
+  companyId: string;
+  categoryId: string;
+  name: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  specification: Record<string, string | number>;
+  price: number;
+  createdAt: string;
+}
+
+// ============================================
+// LAND TRANSPORT MODELS
+// ============================================
+export interface Vehicle {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  categoryId: string;
+  registrationNumber: string;
+  chassisNumber: string;
+  engineNumber: string;
+  make: string;
+  model: string;
+  year: number;
+  color: string;
+  fuelType: 'Petrol' | 'Diesel' | 'CNG' | 'Electric';
+  capacity: number;
+  capacityUnit: 'kg' | 'liters' | 'cubic_meters';
+  status: VehicleStatus;
+  owner: string;
+  insuranceNumber: string;
+  insuranceExpiry: string;
+  pollutionCertificate: string;
+  pollutionExpiry: string;
+  maintenanceSchedule: MaintenanceRecord[];
+  fuelLog: FuelRecord[];
+  currentDriver: string | null;
+  totalDistance: number;
+  lastServiceDate: string;
+  nextServiceDue: string;
+  purchaseDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaintenanceRecord {
+  id: string;
+  vehicleId: string;
+  date: string;
+  type: 'Regular' | 'Repair' | 'Emergency';
+  description: string;
+  cost: number;
+  nextDueDate: string;
+  performedBy: string;
+}
+
+export interface FuelRecord {
+  id: string;
+  vehicleId: string;
+  date: string;
+  quantity: number;
+  cost: number;
+  odometer: number;
+  fuelType: string;
+  location: string;
+}
+
+// ============================================
+// AIR TRANSPORT MODELS
+// ============================================
+export interface Aircraft {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  categoryId: string;
+  registrationNumber: string;
+  manufacturer: string;
+  model: string;
+  manufactureYear: number;
+  serialNumber: string;
+  capacity: number;
+  capacityUnit: 'kg' | 'cubic_meters';
+  maxFlightHours: number;
+  currentFlightHours: number;
+  maxAltitude: number;
+  cruiseSpeed: number;
+  range: number;
+  fuelCapacity: number;
+  status: 'Available' | 'On Route' | 'Maintenance' | 'Grounded';
+  airworthinessExpiry: string;
+  maintenanceLog: AircraftMaintenance[];
+  lastInspection: string;
+  nextInspectionDue: string;
+  crew: {
+    pilotId: string;
+    copilotId: string;
+    engineerIds: string[];
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AircraftMaintenance {
+  id: string;
+  aircraftId: string;
+  date: string;
+  type: 'Routine' | 'Major' | 'Emergency';
+  description: string;
+  flightHoursBefore: number;
+  flightHoursAfter: number;
+  cost: number;
+  certifiedBy: string;
+}
+
+// ============================================
+// WATER TRANSPORT MODELS
+// ============================================
+export interface Ship {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  categoryId: string;
+  vesselName: string;
+  imoNumber: string;
+  callSign: string;
+  flag: string; // Country of registry
+  shipBuilder: string;
+  yearBuilt: number;
+  grossTonnage: number;
+  netTonnage: number;
+  deadWeightTonnage: number;
+  length: number;
+  breadth: number;
+  depth: number;
+  draughtDepth: number;
+  containerCapacity: number; // For container ships
+  cargoHoldCapacity: number;
+  fuelCapacity: number;
+  freshWaterCapacity: number;
+  speed: number; // knots
+  mainEngine: string;
+  auxiliaryEngines: number;
+  class: string; // Ship classification
+  certification: string;
+  certificationExpiry: string;
+  lastDryDock: string;
+  nextDryDockDue: string;
+  crewSize: number;
+  status: 'Active' | 'Inactive' | 'Maintenance' | 'Docked' | 'Decommissioned';
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+    port: string;
+  };
+  crewList: ShipCrew[];
+  maintenanceRecords: ShipMaintenance[];
+  certifications: ShipCertification[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShipCrew {
+  id: string;
+  shipId: string;
+  crewMemberId: string;
+  designation: 'Captain' | 'Chief Officer' | 'Engineer' | 'Cook' | 'Sailor' | 'Other';
+  joinDate: string;
+  leaveDate: string | null;
+}
+
+export interface ShipMaintenance {
+  id: string;
+  shipId: string;
+  date: string;
+  type: 'Routine' | 'Repair' | 'Emergency';
+  description: string;
+  location: string;
+  cost: number;
+  duration: number; // in days
+  doneBy: string; // Shipyard/contractor name
+}
+
+export interface ShipCertification {
+  id: string;
+  shipId: string;
+  type: string; // SOLAS, MARPOL, etc.
+  issuedDate: string;
+  expiryDate: string;
+  issuedBy: string;
+}
+
+export interface Cargo {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  cargoNumber: string;
+  description: string;
+  weight: number;
+  weightUnit: 'kg' | 'tons' | 'lbs';
+  volume: number;
+  volumeUnit: 'cubic_meters' | 'cubic_feet';
+  type: 'General' | 'Hazmat' | 'Perishable' | 'Fragile' | 'Temperature Controlled';
+  packageCount: number;
+  contents: CargoItem[];
+  shipper: {
+    name: string;
+    address: string;
+    contact: string;
+  };
+  consignee: {
+    name: string;
+    address: string;
+    contact: string;
+  };
+  transportMode: 'Land' | 'Air' | 'Water';
+  shipmentRoute: ShipmentLeg[];
+  status: 'Pending' | 'Loaded' | 'In Transit' | 'Delivered' | 'Damaged' | 'Lost';
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+    lastUpdate: string;
+  } | null;
+  insuranceAmount: number;
+  insuranceProvider: string;
+  inspectionRecords: CargoInspection[];
+  temperatureLog: TemperatureLog[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CargoItem {
+  id: string;
+  cargoId: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  weight: number;
+  hsCode: string;
+  hazmatClass: string | null;
+  estimatedValue: number;
+}
+
+export interface ShipmentLeg {
+  id: string;
+  cargoId: string;
+  legNumber: number;
+  origin: string;
+  destination: string;
+  transportType: 'Land' | 'Air' | 'Water';
+  vehicleId: string | null;
+  aircraftId: string | null;
+  shipId: string | null;
+  driverId: string | null;
+  departureDate: string;
+  estimatedArrival: string;
+  actualArrival: string | null;
+  status: 'Scheduled' | 'In Transit' | 'Completed' | 'Delayed' | 'Cancelled';
+}
+
+export interface CargoInspection {
+  id: string;
+  cargoId: string;
+  date: string;
+  inspectionType: 'Pre-Shipment' | 'During Transit' | 'Post-Delivery';
+  inspectedBy: string;
+  findings: string;
+  damageFound: boolean;
+  damageDetails: string | null;
+  photos: string[];
+  passed: boolean;
+}
+
+export interface TemperatureLog {
+  id: string;
+  cargoId: string;
+  timestamp: string;
+  temperature: number;
+  humidity: number;
+  location: string;
+}
+
+export interface Agent {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  username: string;
+  status: 'Active' | 'Inactive' | 'Suspended';
+  roleAssignments: AgentRole[];
+  createdAt: string;
+  createdBy: string; // User ID who created this agent
+  updatedAt: string;
+}
+
+export interface AgentRole {
+  id: string;
+  agentId: string;
+  roleType: UserRole;
+  permissions: AgentPermission[];
+  assignedAt: string;
+  assignedBy: string; // User ID
+  scope: 'company' | 'organization' | 'department'; // Scope of the role
+  scopeId: string | null; // Company/Organization/Department ID
+}
+
+export interface AgentPermission {
+  module: string;
+  action: PermissionAction;
+  allowed: boolean;
+  grantedAt: string;
+}
 
 export interface Shipment {
   id: string;
@@ -146,6 +541,10 @@ export interface User {
   lastLogin: string;
   createdAt: string;
   avatar: string;
+  // Multi-tenancy fields
+  companyId: string | null; // null for SuperAdmin
+  organizationId: string | null; // null for SuperAdmin/CompanyAdmin
+  agentId: string | null; // Links to Agent record for non-admin users
 }
 
 export interface Notification {
@@ -182,7 +581,210 @@ const addresses = [
   '741 C-Scheme, MI Road'
 ];
 
-// MOCK USERS (8 users - one per role)
+// ============================================
+// MOCK COMPANIES (Multi-tenancy)
+// ============================================
+export const mockCompanies: Company[] = [
+  {
+    id: 'cmp-001',
+    name: 'TechLogistics India',
+    registrationType: 'self-service',
+    registrationStatus: 'Approved',
+    status: 'Active',
+    email: 'admin@techlogistics.com',
+    phone: '+91 9876543210',
+    registeredAddress: '123 Business Park, MG Road',
+    city: 'Bangalore',
+    state: 'Karnataka',
+    pincode: '560001',
+    country: 'India',
+    taxId: 'TAX123456',
+    businessType: 'Logistics',
+    registrationDate: '2024-06-15T00:00:00Z',
+    approvalDate: '2024-06-20T00:00:00Z',
+    approvedBy: 'usr-001',
+    logo: null,
+    website: 'https://techlogistics.com',
+    contactPerson: 'Rajesh Kumar',
+    contactPhone: '+91 9876543210',
+    maxOrganizations: 5,
+    maxAgents: 50,
+    currentOrganizations: 2,
+    currentAgents: 15,
+    billingCycle: 'Monthly',
+    plan: 'Professional',
+    documents: [
+      { type: 'registration', url: '/docs/reg-001.pdf', verified: true, uploadedAt: '2024-06-15T00:00:00Z' },
+      { type: 'tax', url: '/docs/tax-001.pdf', verified: true, uploadedAt: '2024-06-15T00:00:00Z' }
+    ],
+    createdAt: '2024-06-15T00:00:00Z',
+    updatedAt: '2024-06-20T00:00:00Z'
+  },
+  {
+    id: 'cmp-002',
+    name: 'Global Express Cargo',
+    registrationType: 'self-service',
+    registrationStatus: 'Submitted',
+    status: 'Pending',
+    email: 'contact@globalexpress.com',
+    phone: '+91 8765432109',
+    registeredAddress: '456 Trade Centre, Airport Road',
+    city: 'Delhi',
+    state: 'Delhi',
+    pincode: '110001',
+    country: 'India',
+    taxId: 'TAX654321',
+    businessType: 'Express',
+    registrationDate: '2024-09-10T00:00:00Z',
+    approvalDate: null,
+    approvedBy: null,
+    logo: null,
+    website: 'https://globalexpress.com',
+    contactPerson: 'Priya Sharma',
+    contactPhone: '+91 8765432109',
+    maxOrganizations: 3,
+    maxAgents: 30,
+    currentOrganizations: 0,
+    currentAgents: 0,
+    billingCycle: 'Quarterly',
+    plan: 'Starter',
+    documents: [
+      { type: 'registration', url: '/docs/reg-002.pdf', verified: true, uploadedAt: '2024-09-10T00:00:00Z' }
+    ],
+    createdAt: '2024-09-10T00:00:00Z',
+    updatedAt: '2024-09-10T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK ORGANIZATIONS
+// ============================================
+export const mockOrganizations: Organization[] = [
+  {
+    id: 'org-001',
+    companyId: 'cmp-001',
+    name: 'Bangalore Regional Office',
+    type: 'Regional',
+    status: 'Active',
+    parentOrganizationId: null,
+    address: '123 Business Park, MG Road',
+    city: 'Bangalore',
+    state: 'Karnataka',
+    pincode: '560001',
+    managerId: 'usr-002',
+    agentCount: 8,
+    createdAt: '2024-06-20T00:00:00Z',
+    updatedAt: '2024-06-20T00:00:00Z'
+  },
+  {
+    id: 'org-002',
+    companyId: 'cmp-001',
+    name: 'Mumbai Distribution Centre',
+    type: 'Branch',
+    status: 'Active',
+    parentOrganizationId: null,
+    address: '789 Logistics Hub, JVLR',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    pincode: '400051',
+    managerId: 'usr-003',
+    agentCount: 7,
+    createdAt: '2024-07-01T00:00:00Z',
+    updatedAt: '2024-07-01T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK AGENTS
+// ============================================
+export const mockAgents: Agent[] = [
+  {
+    id: 'agt-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    name: 'Priya Sharma',
+    email: 'priya.sharma@techlogistics.com',
+    phone: '+91 9876543211',
+    username: 'priya_ops',
+    status: 'Active',
+    roleAssignments: [
+      {
+        id: 'rl-001',
+        agentId: 'agt-001',
+        roleType: 'Manager',
+        permissions: [
+          { module: 'shipments', action: 'view', allowed: true, grantedAt: '2024-06-20T00:00:00Z' },
+          { module: 'shipments', action: 'create', allowed: true, grantedAt: '2024-06-20T00:00:00Z' },
+          { module: 'shipments', action: 'edit', allowed: true, grantedAt: '2024-06-20T00:00:00Z' }
+        ],
+        assignedAt: '2024-06-20T00:00:00Z',
+        assignedBy: 'usr-001',
+        scope: 'organization',
+        scopeId: 'org-001'
+      }
+    ],
+    createdAt: '2024-06-20T00:00:00Z',
+    createdBy: 'usr-001',
+    updatedAt: '2024-06-20T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK TRANSPORT TYPES & CATEGORIES
+// ============================================
+export const mockTransportTypes: TransportType[] = [
+  { id: 'tt-001', companyId: 'cmp-001', name: 'Land', status: 'Active', createdAt: '2024-06-20T00:00:00Z' },
+  { id: 'tt-002', companyId: 'cmp-001', name: 'Air', status: 'Active', createdAt: '2024-06-20T00:00:00Z' },
+  { id: 'tt-003', companyId: 'cmp-001', name: 'Water', status: 'Active', createdAt: '2024-06-20T00:00:00Z' }
+];
+
+export const mockTransportCategories: TransportCategory[] = [
+  {
+    id: 'tc-001',
+    companyId: 'cmp-001',
+    transportTypeId: 'tt-001',
+    name: 'Heavy Truck',
+    description: 'Large cargo trucks for long-distance freight',
+    specifications: { axles: 3, length: '20m', width: '2.5m', height: '3m' },
+    capacity: 25000,
+    capacityUnit: 'kg',
+    maxSpeed: 100,
+    fuelType: 'Diesel',
+    createdAt: '2024-06-20T00:00:00Z'
+  },
+  {
+    id: 'tc-002',
+    companyId: 'cmp-001',
+    transportTypeId: 'tt-003',
+    name: 'Container Ship',
+    description: 'Large container cargo ship for international trade',
+    specifications: { containerCapacity: 10000, draughtDraft: '12.5m', length: '280m' },
+    capacity: 500000,
+    capacityUnit: 'tons',
+    maxSpeed: null,
+    fuelType: 'Bunker Oil',
+    createdAt: '2024-06-20T00:00:00Z'
+  }
+];
+
+export const mockTransportItems: TransportItem[] = [
+  {
+    id: 'ti-001',
+    companyId: 'cmp-001',
+    categoryId: 'tc-001',
+    name: 'Tire Set',
+    description: 'Set of 10 truck tires for heavy vehicles',
+    quantity: 50,
+    unit: 'set',
+    specification: { brand: 'Bridgestone', type: 'All-terrain', size: '295/80R22.5' },
+    price: 15000,
+    createdAt: '2024-06-20T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK USERS (Updated with multi-tenancy)
+// ============================================
 export const mockUsers: User[] = [
   {
     id: 'usr-001',
@@ -191,102 +793,126 @@ export const mockUsers: User[] = [
     name: 'Rajesh Kumar',
     email: 'rajesh.kumar@logisticspro.com',
     phone: '+91 98765 43210',
-    role: 'Admin',
+    role: 'SuperAdmin',
     status: 'Active',
     lastLogin: '2025-01-15T09:30:00Z',
     createdAt: '2024-01-01T00:00:00Z',
-    avatar: 'RK'
+    avatar: 'RK',
+    companyId: null,
+    organizationId: null,
+    agentId: null
   },
   {
     id: 'usr-002',
     username: 'ops_manager',
     password: 'ops123',
     name: 'Priya Sharma',
-    email: 'priya.sharma@logisticspro.com',
+    email: 'priya.sharma@techlogistics.com',
     phone: '+91 98765 43211',
     role: 'Manager',
     status: 'Active',
     lastLogin: '2025-01-15T08:45:00Z',
     createdAt: '2024-02-15T00:00:00Z',
-    avatar: 'PS'
+    avatar: 'PS',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: 'agt-001'
   },
   {
     id: 'usr-003',
     username: 'dispatch',
     password: 'dispatch123',
     name: 'Amit Patel',
-    email: 'amit.patel@logisticspro.com',
+    email: 'amit.patel@techlogistics.com',
     phone: '+91 98765 43212',
     role: 'Dispatcher',
     status: 'Active',
     lastLogin: '2025-01-15T07:00:00Z',
     createdAt: '2024-03-10T00:00:00Z',
-    avatar: 'AP'
+    avatar: 'AP',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    agentId: null
   },
   {
     id: 'usr-004',
     username: 'warehouse',
     password: 'warehouse123',
     name: 'Sunita Reddy',
-    email: 'sunita.reddy@logisticspro.com',
+    email: 'sunita.reddy@techlogistics.com',
     phone: '+91 98765 43213',
-    role: 'Staff',
+    role: 'Agent',
     status: 'Active',
     lastLogin: '2025-01-14T18:00:00Z',
     createdAt: '2024-04-05T00:00:00Z',
-    avatar: 'SR'
+    avatar: 'SR',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: null
   },
   {
     id: 'usr-005',
     username: 'driver01',
     password: 'driver123',
     name: 'Mohammed Khan',
-    email: 'mohammed.khan@logisticspro.com',
+    email: 'mohammed.khan@techlogistics.com',
     phone: '+91 98765 43214',
-    role: 'Staff',
+    role: 'Agent',
     status: 'Active',
     lastLogin: '2025-01-15T06:00:00Z',
     createdAt: '2024-05-20T00:00:00Z',
-    avatar: 'MK'
+    avatar: 'MK',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: null
   },
   {
     id: 'usr-006',
     username: 'finance',
     password: 'finance123',
     name: 'Ananya Gupta',
-    email: 'ananya.gupta@logisticspro.com',
+    email: 'ananya.gupta@techlogistics.com',
     phone: '+91 98765 43215',
-    role: 'Staff',
+    role: 'Agent',
     status: 'Active',
     lastLogin: '2025-01-15T10:00:00Z',
     createdAt: '2024-06-12T00:00:00Z',
-    avatar: 'AG'
+    avatar: 'AG',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: null
   },
   {
     id: 'usr-007',
     username: 'support',
     password: 'support123',
     name: 'Vikram Singh',
-    email: 'vikram.singh@logisticspro.com',
+    email: 'vikram.singh@techlogistics.com',
     phone: '+91 98765 43216',
     role: 'Staff',
     status: 'Active',
     lastLogin: '2025-01-15T09:00:00Z',
     createdAt: '2024-07-08T00:00:00Z',
-    avatar: 'VS'
+    avatar: 'VS',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    agentId: null
   },
   {
     id: 'usr-008',
-    username: 'customer01',
+    username: 'company_admin',
     password: 'cust123',
-    name: 'Neha Enterprises',
-    email: 'contact@nehaenterprises.com',
+    name: 'Vikram Sharma',
+    email: 'admin@techlogistics.com',
     phone: '+91 98765 43217',
-    role: 'Staff',
+    role: 'CompanyAdmin',
     status: 'Active',
     lastLogin: '2025-01-14T14:30:00Z',
     createdAt: '2024-08-01T00:00:00Z',
-    avatar: 'NE'
+    avatar: 'VS',
+    companyId: 'cmp-001',
+    organizationId: null,
+    agentId: null
   }
 ];
 
@@ -365,21 +991,301 @@ export const mockOrders: Order[] = Array.from({ length: 25 }, (_, i) => {
 
 // MOCK VEHICLES (15+ vehicles)
 export const mockVehicles: Vehicle[] = [
-  { id: 'veh-001', vehicleId: 'VEH-001', type: 'Truck', licensePlate: 'MH 12 AB 1234', model: 'Tata 407', capacity: '3000 kg', status: 'Available', assignedDriver: 'drv-001', currentLocation: 'Mumbai Warehouse', maintenanceHistory: [{ date: '2024-12-15', description: 'Oil change and brake check', cost: 5000 }], fuelLogs: [{ date: '2025-01-14', liters: 80, cost: 7200 }] },
-  { id: 'veh-002', vehicleId: 'VEH-002', type: 'Van', licensePlate: 'DL 01 CD 5678', model: 'Mahindra Supro', capacity: '1000 kg', status: 'On Route', assignedDriver: 'drv-002', currentLocation: 'En route to Delhi', maintenanceHistory: [{ date: '2024-11-20', description: 'Tire replacement', cost: 12000 }], fuelLogs: [{ date: '2025-01-15', liters: 45, cost: 4050 }] },
-  { id: 'veh-003', vehicleId: 'VEH-003', type: 'Bike', licensePlate: 'KA 05 EF 9012', model: 'TVS Apache RTR', capacity: '20 kg', status: 'Available', assignedDriver: 'drv-003', currentLocation: 'Bangalore Hub', maintenanceHistory: [{ date: '2025-01-05', description: 'Chain lubrication', cost: 500 }], fuelLogs: [{ date: '2025-01-15', liters: 8, cost: 800 }] },
-  { id: 'veh-004', vehicleId: 'VEH-004', type: 'Tempo', licensePlate: 'TN 07 GH 3456', model: 'Ashok Leyland Dost', capacity: '1500 kg', status: 'Maintenance', assignedDriver: null, currentLocation: 'Chennai Workshop', maintenanceHistory: [{ date: '2025-01-10', description: 'Engine overhaul', cost: 25000 }], fuelLogs: [{ date: '2025-01-08', liters: 55, cost: 4950 }] },
-  { id: 'veh-005', vehicleId: 'VEH-005', type: 'Truck', licensePlate: 'GJ 01 IJ 7890', model: 'Eicher Pro 1059', capacity: '5000 kg', status: 'On Route', assignedDriver: 'drv-004', currentLocation: 'Highway - Ahmedabad to Mumbai', maintenanceHistory: [{ date: '2024-10-25', description: 'Full service', cost: 15000 }], fuelLogs: [{ date: '2025-01-15', liters: 120, cost: 10800 }] },
-  { id: 'veh-006', vehicleId: 'VEH-006', type: 'Van', licensePlate: 'AP 09 KL 2345', model: 'Force Traveller', capacity: '1200 kg', status: 'Available', assignedDriver: 'drv-005', currentLocation: 'Hyderabad Depot', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-14', liters: 50, cost: 4500 }] },
-  { id: 'veh-007', vehicleId: 'VEH-007', type: 'Bike', licensePlate: 'MH 04 MN 6789', model: 'Honda Shine', capacity: '15 kg', status: 'Available', assignedDriver: 'drv-006', currentLocation: 'Pune Office', maintenanceHistory: [{ date: '2024-12-01', description: 'Battery replacement', cost: 3000 }], fuelLogs: [{ date: '2025-01-15', liters: 6, cost: 600 }] },
-  { id: 'veh-008', vehicleId: 'VEH-008', type: 'Truck', licensePlate: 'RJ 14 OP 1234', model: 'BharatBenz 1217C', capacity: '7000 kg', status: 'Inactive', assignedDriver: null, currentLocation: 'Jaipur Yard', maintenanceHistory: [{ date: '2024-09-15', description: 'Major repair needed', cost: 50000 }], fuelLogs: [] },
-  { id: 'veh-009', vehicleId: 'VEH-009', type: 'Tempo', licensePlate: 'WB 02 QR 5678', model: 'Tata Ace Gold', capacity: '750 kg', status: 'On Route', assignedDriver: 'drv-007', currentLocation: 'Kolkata to Howrah', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-15', liters: 25, cost: 2250 }] },
-  { id: 'veh-010', vehicleId: 'VEH-010', type: 'Van', licensePlate: 'MP 09 ST 9012', model: 'Maruti Eeco Cargo', capacity: '600 kg', status: 'Available', assignedDriver: 'drv-008', currentLocation: 'Indore Hub', maintenanceHistory: [{ date: '2025-01-02', description: 'AC repair', cost: 8000 }], fuelLogs: [{ date: '2025-01-14', liters: 35, cost: 3150 }] },
-  { id: 'veh-011', vehicleId: 'VEH-011', type: 'Truck', licensePlate: 'KA 01 UV 3456', model: 'Tata Prima', capacity: '10000 kg', status: 'On Route', assignedDriver: 'drv-009', currentLocation: 'Bangalore to Chennai Highway', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-15', liters: 150, cost: 13500 }] },
-  { id: 'veh-012', vehicleId: 'VEH-012', type: 'Bike', licensePlate: 'DL 08 WX 7890', model: 'Bajaj Pulsar', capacity: '25 kg', status: 'Maintenance', assignedDriver: null, currentLocation: 'Delhi Service Center', maintenanceHistory: [{ date: '2025-01-12', description: 'Engine tune-up', cost: 2000 }], fuelLogs: [] },
-  { id: 'veh-013', vehicleId: 'VEH-013', type: 'Tempo', licensePlate: 'MH 14 YZ 2345', model: 'Mahindra Bolero Pickup', capacity: '1100 kg', status: 'Available', assignedDriver: 'drv-010', currentLocation: 'Pune Warehouse', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-14', liters: 40, cost: 3600 }] },
-  { id: 'veh-014', vehicleId: 'VEH-014', type: 'Van', licensePlate: 'TN 01 AB 6789', model: 'Tata Winger', capacity: '1500 kg', status: 'On Route', assignedDriver: 'drv-011', currentLocation: 'Chennai to Coimbatore', maintenanceHistory: [{ date: '2024-11-10', description: 'Suspension check', cost: 6000 }], fuelLogs: [{ date: '2025-01-15', liters: 60, cost: 5400 }] },
-  { id: 'veh-015', vehicleId: 'VEH-015', type: 'Truck', licensePlate: 'GJ 05 CD 1234', model: 'Ashok Leyland Ecomet', capacity: '8000 kg', status: 'Available', assignedDriver: 'drv-012', currentLocation: 'Ahmedabad Depot', maintenanceHistory: [], fuelLogs: [{ date: '2025-01-13', liters: 100, cost: 9000 }] },
+  {
+    id: 'veh-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'tc-001',
+    registrationNumber: 'MH 12 AB 1234',
+    chassisNumber: 'TATA123456789ABC',
+    engineNumber: 'TEM789123456',
+    make: 'Tata',
+    model: '407',
+    year: 2020,
+    color: 'White',
+    fuelType: 'Diesel',
+    capacity: 3000,
+    capacityUnit: 'kg',
+    status: 'Available',
+    owner: 'TechLogistics India',
+    insuranceNumber: 'INS123456',
+    insuranceExpiry: '2025-12-31',
+    pollutionCertificate: 'PC789456',
+    pollutionExpiry: '2025-06-30',
+    maintenanceSchedule: [
+      { id: 'mtn-001', vehicleId: 'veh-001', date: '2024-12-15', type: 'Regular', description: 'Oil change and brake check', cost: 5000, nextDueDate: '2025-03-15', performedBy: 'Workshop A' }
+    ],
+    fuelLog: [
+      { id: 'fl-001', vehicleId: 'veh-001', date: '2025-01-14', quantity: 80, cost: 7200, odometer: 145000, fuelType: 'Diesel', location: 'Mumbai Fuel Station' }
+    ],
+    currentDriver: 'drv-001',
+    totalDistance: 145000,
+    lastServiceDate: '2024-12-15',
+    nextServiceDue: '2025-03-15',
+    purchaseDate: '2020-06-10',
+    createdAt: '2020-06-10',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'veh-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    categoryId: 'tc-001',
+    registrationNumber: 'DL 01 CD 5678',
+    chassisNumber: 'MAHIND234567890',
+    engineNumber: 'MEG456789012',
+    make: 'Mahindra',
+    model: 'Supro',
+    year: 2019,
+    color: 'Blue',
+    fuelType: 'Diesel',
+    capacity: 1000,
+    capacityUnit: 'kg',
+    status: 'On Route',
+    owner: 'TechLogistics India',
+    insuranceNumber: 'INS654321',
+    insuranceExpiry: '2025-11-15',
+    pollutionCertificate: 'PC123789',
+    pollutionExpiry: '2025-05-15',
+    maintenanceSchedule: [
+      { id: 'mtn-002', vehicleId: 'veh-002', date: '2024-11-20', type: 'Repair', description: 'Tire replacement', cost: 12000, nextDueDate: '2025-05-20', performedBy: 'TireFix Center' }
+    ],
+    fuelLog: [
+      { id: 'fl-002', vehicleId: 'veh-002', date: '2025-01-15', quantity: 45, cost: 4050, odometer: 98765, fuelType: 'Diesel', location: 'Delhi Fuel Station' }
+    ],
+    currentDriver: 'drv-002',
+    totalDistance: 98765,
+    lastServiceDate: '2024-11-20',
+    nextServiceDue: '2025-05-20',
+    purchaseDate: '2019-03-22',
+    createdAt: '2019-03-22',
+    updatedAt: '2025-01-15'
+  },
+];
+
+// MOCK AIRCRAFT (4 aircraft)
+export const mockAircraft: Aircraft[] = [
+  {
+    id: 'air-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'ac-001',
+    registrationNumber: 'VT-ABC',
+    manufacturer: 'Boeing',
+    model: '737 Freighter',
+    manufactureYear: 2015,
+    serialNumber: 'BB737F001',
+    capacity: 25000,
+    capacityUnit: 'kg',
+    maxFlightHours: 75000,
+    currentFlightHours: 45230,
+    maxAltitude: 43000,
+    cruiseSpeed: 500,
+    range: 5400,
+    fuelCapacity: 26730,
+    status: 'Available',
+    airworthinessExpiry: '2025-12-31',
+    maintenanceLog: [
+      { id: 'am-001', aircraftId: 'air-001', date: '2024-11-15', type: 'Routine', description: 'Pre-flight inspection', flightHoursBefore: 45200, flightHoursAfter: 45230, cost: 50000, certifiedBy: 'CAA Inspector' }
+    ],
+    lastInspection: '2024-11-15',
+    nextInspectionDue: '2025-05-15',
+    crew: { pilotId: 'crew-001', copilotId: 'crew-002', engineerIds: ['crew-003'] },
+    createdAt: '2015-06-15',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'air-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'ac-001',
+    registrationNumber: 'VT-XYZ',
+    manufacturer: 'Airbus',
+    model: 'A330 Freighter',
+    manufactureYear: 2018,
+    serialNumber: 'AA330F002',
+    capacity: 65000,
+    capacityUnit: 'kg',
+    maxFlightHours: 90000,
+    currentFlightHours: 32500,
+    maxAltitude: 43000,
+    cruiseSpeed: 475,
+    range: 7400,
+    fuelCapacity: 139090,
+    status: 'Maintenance',
+    airworthinessExpiry: '2026-06-30',
+    maintenanceLog: [
+      { id: 'am-002', aircraftId: 'air-002', date: '2025-01-10', type: 'Major', description: 'Engine overhaul', flightHoursBefore: 32500, flightHoursAfter: 32500, cost: 500000, certifiedBy: 'Airbus Service Center' }
+    ],
+    lastInspection: '2025-01-10',
+    nextInspectionDue: '2025-07-10',
+    crew: { pilotId: 'crew-004', copilotId: 'crew-005', engineerIds: ['crew-006', 'crew-007'] },
+    createdAt: '2018-09-20',
+    updatedAt: '2025-01-10'
+  }
+];
+
+// MOCK SHIPS (3 ships)
+export const mockShips: Ship[] = [
+  {
+    id: 'ship-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    categoryId: 'sc-001',
+    vesselName: 'TechCargo Express',
+    imoNumber: '9876543',
+    callSign: 'TCEX',
+    flag: 'India',
+    shipBuilder: 'Cochin Shipyard',
+    yearBuilt: 2015,
+    grossTonnage: 50000,
+    netTonnage: 35000,
+    deadWeightTonnage: 65000,
+    length: 225,
+    breadth: 32,
+    depth: 18,
+    draughtDepth: 10.5,
+    containerCapacity: 3500,
+    cargoHoldCapacity: 75000,
+    fuelCapacity: 3500,
+    freshWaterCapacity: 350,
+    speed: 22,
+    mainEngine: 'MAN B&W 6S70ME-C',
+    auxiliaryEngines: 3,
+    class: 'Lloyd Register',
+    certification: 'SOLAS, MARPOL',
+    certificationExpiry: '2026-12-31',
+    lastDryDock: '2023-06-15',
+    nextDryDockDue: '2026-06-15',
+    crewSize: 25,
+    status: 'Active',
+    currentLocation: { latitude: 19.0760, longitude: 72.8777, port: 'Mumbai Port' },
+    crewList: [
+      { id: 'crew-s001', shipId: 'ship-001', crewMemberId: 'crew-010', designation: 'Captain', joinDate: '2019-01-15', leaveDate: null },
+      { id: 'crew-s002', shipId: 'ship-001', crewMemberId: 'crew-011', designation: 'Chief Officer', joinDate: '2020-06-20', leaveDate: null }
+    ],
+    maintenanceRecords: [
+      { id: 'sm-001', shipId: 'ship-001', date: '2024-12-01', type: 'Routine', description: 'Hull inspection and maintenance', location: 'Mumbai Dry Dock', cost: 250000, duration: 5, doneBy: 'Mumbai Shipyard' }
+    ],
+    certifications: [
+      { id: 'sc-001', shipId: 'ship-001', type: 'SOLAS', issuedDate: '2023-01-15', expiryDate: '2026-12-31', issuedBy: 'Lloyd Register' },
+      { id: 'sc-002', shipId: 'ship-001', type: 'MARPOL', issuedDate: '2023-01-15', expiryDate: '2026-12-31', issuedBy: 'Lloyd Register' }
+    ],
+    createdAt: '2015-06-20',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'ship-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    categoryId: 'sc-001',
+    vesselName: 'IndianOcean Carrier',
+    imoNumber: '8765432',
+    callSign: 'IOC',
+    flag: 'Singapore',
+    shipBuilder: 'Hyundai Heavy Industries',
+    yearBuilt: 2018,
+    grossTonnage: 120000,
+    netTonnage: 80000,
+    deadWeightTonnage: 155000,
+    length: 320,
+    breadth: 44,
+    depth: 25,
+    draughtDepth: 13.5,
+    containerCapacity: 10000,
+    cargoHoldCapacity: 185000,
+    fuelCapacity: 5000,
+    freshWaterCapacity: 500,
+    speed: 19.5,
+    mainEngine: 'MAN B&W 8S90ME-C',
+    auxiliaryEngines: 4,
+    class: 'ABS',
+    certification: 'SOLAS, MARPOL, ISM',
+    certificationExpiry: '2027-06-30',
+    lastDryDock: '2022-03-10',
+    nextDryDockDue: '2025-03-10',
+    crewSize: 35,
+    status: 'Active',
+    currentLocation: { latitude: 12.9716, longitude: 77.5946, port: 'Singapore Port' },
+    crewList: [],
+    maintenanceRecords: [],
+    certifications: [],
+    createdAt: '2018-09-15',
+    updatedAt: '2025-01-15'
+  }
+];
+
+// MOCK CARGO (5 cargo shipments)
+export const mockCargo: Cargo[] = [
+  {
+    id: 'cargo-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    cargoNumber: 'CARGO-2025-001',
+    description: 'Electronics Export - Container',
+    weight: 15000,
+    weightUnit: 'kg',
+    volume: 25,
+    volumeUnit: 'cubic_meters',
+    type: 'General',
+    packageCount: 250,
+    contents: [
+      { id: 'ci-001', cargoId: 'cargo-001', description: 'Laptop Computers', quantity: 100, unit: 'units', weight: 10000, hsCode: '8471.30', hazmatClass: null, estimatedValue: 3000000 },
+      { id: 'ci-002', cargoId: 'cargo-001', description: 'Mobile Devices', quantity: 150, unit: 'units', weight: 5000, hsCode: '8517.62', hazmatClass: null, estimatedValue: 2000000 }
+    ],
+    shipper: { name: 'Tech Exports Ltd', address: 'Bangalore, India', contact: '+91 9876543210' },
+    consignee: { name: 'Global Tech Imports', address: 'Singapore', contact: '+65 98765432' },
+    transportMode: 'Water',
+    shipmentRoute: [
+      { id: 'leg-001', cargoId: 'cargo-001', legNumber: 1, origin: 'Bangalore', destination: 'Mumbai Port', transportType: 'Land', vehicleId: 'veh-001', aircraftId: null, shipId: null, driverId: 'drv-001', departureDate: '2025-01-10', estimatedArrival: '2025-01-12', actualArrival: '2025-01-12', status: 'Completed' },
+      { id: 'leg-002', cargoId: 'cargo-001', legNumber: 2, origin: 'Mumbai Port', destination: 'Singapore Port', transportType: 'Water', vehicleId: null, aircraftId: null, shipId: 'ship-001', driverId: null, departureDate: '2025-01-13', estimatedArrival: '2025-01-28', actualArrival: null, status: 'In Transit' }
+    ],
+    status: 'In Transit',
+    currentLocation: { latitude: 4.1748, longitude: 101.6964, lastUpdate: '2025-01-14T10:30:00Z' },
+    insuranceAmount: 5000000,
+    insuranceProvider: 'Global Insurance Corp',
+    inspectionRecords: [
+      { id: 'insp-001', cargoId: 'cargo-001', date: '2025-01-10', inspectionType: 'Pre-Shipment', inspectedBy: 'Inspector A', findings: 'All goods in good condition', damageFound: false, damageDetails: null, photos: [], passed: true }
+    ],
+    temperatureLog: [
+      { id: 'tl-001', cargoId: 'cargo-001', timestamp: '2025-01-14T10:00:00Z', temperature: 22, humidity: 45, location: 'Ship Container' }
+    ],
+    createdAt: '2025-01-10',
+    updatedAt: '2025-01-14'
+  },
+  {
+    id: 'cargo-002',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    cargoNumber: 'CARGO-2025-002',
+    description: 'Pharmaceutical Shipment - Temperature Controlled',
+    weight: 2500,
+    weightUnit: 'kg',
+    volume: 8,
+    volumeUnit: 'cubic_meters',
+    type: 'Temperature Controlled',
+    packageCount: 50,
+    contents: [
+      { id: 'ci-003', cargoId: 'cargo-002', description: 'Medicine Boxes', quantity: 50, unit: 'boxes', weight: 2500, hsCode: '3004.90', hazmatClass: null, estimatedValue: 500000 }
+    ],
+    shipper: { name: 'Pharma Industries Ltd', address: 'Hyderabad, India', contact: '+91 8765432109' },
+    consignee: { name: 'Medical Supplies Co', address: 'Dubai', contact: '+971 123456789' },
+    transportMode: 'Air',
+    shipmentRoute: [
+      { id: 'leg-003', cargoId: 'cargo-002', legNumber: 1, origin: 'Hyderabad', destination: 'Bangalore Airport', transportType: 'Land', vehicleId: 'veh-002', aircraftId: null, shipId: null, driverId: 'drv-002', departureDate: '2025-01-12', estimatedArrival: '2025-01-12', actualArrival: '2025-01-12', status: 'Completed' },
+      { id: 'leg-004', cargoId: 'cargo-002', legNumber: 2, origin: 'Bangalore Airport', destination: 'Dubai Airport', transportType: 'Air', vehicleId: null, aircraftId: 'air-001', shipId: null, driverId: null, departureDate: '2025-01-13', estimatedArrival: '2025-01-14', actualArrival: null, status: 'In Transit' }
+    ],
+    status: 'In Transit',
+    currentLocation: { latitude: 29.4454, longitude: 65.5031, lastUpdate: '2025-01-14T15:45:00Z' },
+    insuranceAmount: 600000,
+    insuranceProvider: 'AirCargo Insurance',
+    inspectionRecords: [],
+    temperatureLog: [
+      { id: 'tl-002', cargoId: 'cargo-002', timestamp: '2025-01-14T15:00:00Z', temperature: 2, humidity: 35, location: 'Air Container' }
+    ],
+    createdAt: '2025-01-12',
+    updatedAt: '2025-01-14'
+  }
 ];
 
 // MOCK DRIVERS (20+ drivers)
@@ -665,15 +1571,29 @@ export const mockAnalytics = {
 
 // Role-based menu configuration
 export const roleMenuConfig: Record<UserRole, string[]> = {
-  'Admin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'finance', 'reports', 'notifications', 'users', 'settings'],
+  'SuperAdmin': ['dashboard', 'companies', 'organizations', 'fleet', 'dispatch', 'reports', 'users', 'settings'],
+  'CompanyAdmin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'agents', 'transport', 'finance', 'reports', 'notifications', 'settings'],
   'Manager': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'reports', 'notifications', 'settings'],
   'Dispatcher': ['dashboard', 'shipments', 'dispatch', 'drivers', 'fleet', 'notifications'],
+  'Agent': ['dashboard', 'shipments', 'orders', 'customers', 'finance', 'warehouse', 'reports', 'notifications'],
   'Staff': ['dashboard', 'shipments', 'orders', 'customers', 'finance', 'warehouse', 'reports', 'notifications'],
+  'Operator': ['dashboard', 'shipments', 'dispatch', 'drivers', 'fleet', 'notifications'],
+  'Admin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'finance', 'reports', 'notifications', 'users', 'settings'],
 };
 
 // Role-based permissions
 export const rolePermissions: Record<UserRole, Record<string, { view: boolean; create: boolean; edit: boolean; delete: boolean }>> = {
-  'Admin': {
+  'SuperAdmin': {
+    companies: { view: true, create: true, edit: true, delete: true },
+    organizations: { view: true, create: true, edit: true, delete: true },
+    dashboard: { view: true, create: false, edit: false, delete: false },
+    fleet: { view: true, create: false, edit: false, delete: false },
+    dispatch: { view: true, create: false, edit: false, delete: false },
+    reports: { view: true, create: true, edit: false, delete: false },
+    users: { view: true, create: true, edit: true, delete: true },
+    settings: { view: true, create: true, edit: true, delete: true },
+  },
+  'CompanyAdmin': {
     shipments: { view: true, create: true, edit: true, delete: true },
     orders: { view: true, create: true, edit: true, delete: true },
     fleet: { view: true, create: true, edit: true, delete: true },
@@ -681,6 +1601,8 @@ export const rolePermissions: Record<UserRole, Record<string, { view: boolean; c
     dispatch: { view: true, create: true, edit: true, delete: true },
     warehouse: { view: true, create: true, edit: true, delete: true },
     customers: { view: true, create: true, edit: true, delete: true },
+    agents: { view: true, create: true, edit: true, delete: true },
+    transport: { view: true, create: true, edit: true, delete: true },
     finance: { view: true, create: true, edit: true, delete: true },
     reports: { view: true, create: true, edit: true, delete: true },
     users: { view: true, create: true, edit: true, delete: true },
@@ -712,6 +1634,19 @@ export const rolePermissions: Record<UserRole, Record<string, { view: boolean; c
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: false, create: false, edit: false, delete: false },
   },
+  'Agent': {
+    shipments: { view: true, create: true, edit: true, delete: false },
+    orders: { view: true, create: true, edit: true, delete: false },
+    fleet: { view: false, create: false, edit: false, delete: false },
+    drivers: { view: false, create: false, edit: false, delete: false },
+    dispatch: { view: false, create: false, edit: false, delete: false },
+    warehouse: { view: true, create: true, edit: true, delete: false },
+    customers: { view: true, create: true, edit: true, delete: false },
+    finance: { view: true, create: false, edit: false, delete: false },
+    reports: { view: true, create: false, edit: false, delete: false },
+    users: { view: false, create: false, edit: false, delete: false },
+    settings: { view: false, create: false, edit: false, delete: false },
+  },
   'Staff': {
     shipments: { view: true, create: true, edit: true, delete: false },
     orders: { view: true, create: true, edit: true, delete: false },
@@ -724,5 +1659,31 @@ export const rolePermissions: Record<UserRole, Record<string, { view: boolean; c
     reports: { view: true, create: false, edit: false, delete: false },
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: false, create: false, edit: false, delete: false },
+  },
+  'Operator': {
+    shipments: { view: true, create: false, edit: true, delete: false },
+    orders: { view: true, create: false, edit: false, delete: false },
+    fleet: { view: true, create: false, edit: false, delete: false },
+    drivers: { view: true, create: false, edit: false, delete: false },
+    dispatch: { view: true, create: true, edit: true, delete: false },
+    warehouse: { view: false, create: false, edit: false, delete: false },
+    customers: { view: false, create: false, edit: false, delete: false },
+    finance: { view: false, create: false, edit: false, delete: false },
+    reports: { view: false, create: false, edit: false, delete: false },
+    users: { view: false, create: false, edit: false, delete: false },
+    settings: { view: false, create: false, edit: false, delete: false },
+  },
+  'Admin': {
+    shipments: { view: true, create: true, edit: true, delete: true },
+    orders: { view: true, create: true, edit: true, delete: true },
+    fleet: { view: true, create: true, edit: true, delete: true },
+    drivers: { view: true, create: true, edit: true, delete: true },
+    dispatch: { view: true, create: true, edit: true, delete: true },
+    warehouse: { view: true, create: true, edit: true, delete: true },
+    customers: { view: true, create: true, edit: true, delete: true },
+    finance: { view: true, create: true, edit: true, delete: true },
+    reports: { view: true, create: true, edit: true, delete: true },
+    users: { view: true, create: true, edit: true, delete: true },
+    settings: { view: true, create: true, edit: true, delete: true },
   },
 };
