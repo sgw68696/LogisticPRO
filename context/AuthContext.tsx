@@ -58,10 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       await logoutService();
+    } finally {
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       setUser(null);
-    } finally {
       setIsLoading(false);
     }
   }, []);

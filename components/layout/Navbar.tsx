@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Bell, ChevronRight, Sun, Moon,
@@ -41,6 +41,7 @@ const pathLabels: Record<string, string> = {
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead } = useNotifications();
   const { theme, setTheme } = useTheme();
@@ -53,6 +54,11 @@ export function Navbar() {
   }));
 
   const recentNotifications = notifications.slice(0, 5);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
 
   return (
     <header className="
@@ -371,7 +377,7 @@ export function Navbar() {
               <DropdownMenuSeparator className="bg-border/50" />
 
               <DropdownMenuItem
-                onClick={logout}
+                onClick={handleLogout}
                 className="
                   flex items-center gap-2 mx-1 mb-1 px-2.5 py-2
                   rounded-[8px] cursor-pointer

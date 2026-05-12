@@ -5,7 +5,6 @@ import { KPICard } from '@/components/shared/KPICard';
 import { Button } from '@/components/ui/button';
 import {
   Building2, Users, TrendingUp, AlertCircle,
-  ArrowUpRight, Package,
 } from 'lucide-react';
 
 export default function SuperAdminDashboard() {
@@ -15,30 +14,30 @@ export default function SuperAdminDashboard() {
         <KPICard
           title="Total Companies"
           value="24"
-          icon={Building2}
-          trend={{ value: 12, direction: 'up' }}
-          color="blue"
+          icon={<Building2 className="w-5 h-5" />}
+          trend={{ value: 12, isPositive: true }}
+          iconColor="cyan"
         />
         <KPICard
           title="Active Users"
           value="456"
-          icon={Users}
-          trend={{ value: 8, direction: 'up' }}
-          color="green"
+          icon={<Users className="w-5 h-5" />}
+          trend={{ value: 8, isPositive: true }}
+          iconColor="green"
         />
         <KPICard
           title="Platform Revenue"
           value="$124.5K"
-          icon={TrendingUp}
-          trend={{ value: 15, direction: 'up' }}
-          color="purple"
+          icon={<TrendingUp className="w-5 h-5" />}
+          trend={{ value: 15, isPositive: true }}
+          iconColor="indigo"
         />
         <KPICard
           title="Pending Approvals"
           value="3"
-          icon={AlertCircle}
-          trend={{ value: 0, direction: 'neutral' }}
-          color="amber"
+          icon={<AlertCircle className="w-5 h-5" />}
+          description="Needs review"
+          iconColor="amber"
         />
       </div>
 
