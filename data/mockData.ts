@@ -901,7 +901,7 @@ export const mockUsers: User[] = [
   {
     id: 'usr-008',
     username: 'company_admin',
-    password: 'cust123',
+    password: 'admin123',
     name: 'Vikram Sharma',
     email: 'admin@techlogistics.com',
     phone: '+91 98765 43217',
@@ -912,6 +912,38 @@ export const mockUsers: User[] = [
     avatar: 'VS',
     companyId: 'cmp-001',
     organizationId: null,
+    agentId: null
+  },
+  {
+    id: 'usr-009',
+    username: 'operator01',
+    password: 'operator123',
+    name: 'Rajesh Verma',
+    email: 'rajesh.verma@techlogistics.com',
+    phone: '+91 98765 43218',
+    role: 'Operator',
+    status: 'Active',
+    lastLogin: '2025-01-15T11:00:00Z',
+    createdAt: '2024-09-15T00:00:00Z',
+    avatar: 'RV',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: null
+  },
+  {
+    id: 'usr-010',
+    username: 'staff01',
+    password: 'staff123',
+    name: 'Neha Tripathi',
+    email: 'neha.tripathi@techlogistics.com',
+    phone: '+91 98765 43219',
+    role: 'Staff',
+    status: 'Active',
+    lastLogin: '2025-01-15T12:00:00Z',
+    createdAt: '2024-10-01T00:00:00Z',
+    avatar: 'NT',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
     agentId: null
   }
 ];
