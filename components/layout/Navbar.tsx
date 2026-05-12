@@ -21,6 +21,10 @@ import { APP_CONFIG } from '@/config/appConfig';
 
 const pathLabels: Record<string, string> = {
   dashboard: 'Dashboard',
+  companies: 'Companies',
+  organizations: 'Organizations',
+  agents: 'Agents',
+  transport: 'Transport Management',
   shipments: 'Shipments',
   orders: 'Orders',
   fleet: 'Fleet Management',
