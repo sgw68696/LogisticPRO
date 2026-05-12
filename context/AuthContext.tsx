@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as loginService, logout as logoutService, type AuthResponse } from '@/services/authService';
 import { roleMenuConfig, rolePermissions, type User, type UserRole, type PermissionAction } from '@/data/mockData';
+import { ROLE_DASHBOARD_MAP } from '@/services/authService';
 
 interface AuthContextType {
   user: User | null;
@@ -14,8 +15,10 @@ interface AuthContextType {
   allowedMenuItems: string[];
   isSuperAdmin: boolean;
   isCompanyAdmin: boolean;
+  isStaff: boolean;
   canManageUsers: boolean;
   canManageAgents: boolean;
+  getDashboardRoute: () => string;
   getCurrentCompanyId: () => string | null;
   getCurrentOrganizationId: () => string | null;
 }
@@ -76,11 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const isSuperAdmin = user?.role === 'SuperAdmin';
   const isCompanyAdmin = user?.role === 'CompanyAdmin';
+  const isStaff = user?.role === 'Staff';
   const canManageUsers = isSuperAdmin || isCompanyAdmin;
   const canManageAgents = isCompanyAdmin || user?.role === 'Manager';
   
   const getCurrentCompanyId = useCallback(() => user?.companyId || null, [user]);
   const getCurrentOrganizationId = useCallback(() => user?.organizationId || null, [user]);
+  const getDashboardRoute = useCallback(() => {
+    if (!user) return '/login';
+    return ROLE_DASHBOARD_MAP[user.role as UserRole] || '/dashboard';
+  }, [user]);
 
   return (
     <AuthContext.Provider
@@ -94,8 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         allowedMenuItems,
         isSuperAdmin,
         isCompanyAdmin,
+        isStaff,
         canManageUsers,
         canManageAgents,
+        getDashboardRoute,
         getCurrentCompanyId,
         getCurrentOrganizationId,
       }}

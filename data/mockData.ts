@@ -1613,6 +1613,76 @@ export const roleMenuConfig: Record<UserRole, string[]> = {
   'Admin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'finance', 'reports', 'notifications', 'users', 'settings'],
 };
 
+// Role-based menu access
+export const ROLE_MENU_ACCESS = {
+  SuperAdmin: [
+    '/admin/dashboard',
+    '/admin/org/companies', '/admin/org/organizations', '/admin/org/company-types',
+    '/admin/org/subscription-plans', '/admin/org/approvals',
+    '/admin/users/all', '/admin/users/roles', '/admin/users/rbac-matrix', '/admin/users/login-activity',
+    '/admin/logistics/carriers', '/admin/logistics/ports', '/admin/logistics/airports',
+    '/admin/logistics/container-types', '/admin/logistics/incoterms', '/admin/logistics/transport-modes',
+    '/admin/ops/shipments', '/admin/ops/container-tracking', '/admin/ops/bol-monitoring',
+    '/admin/ops/carrier-tracking', '/admin/ops/dispatch-monitoring', '/admin/ops/fleet-monitoring',
+    '/admin/ops/warehouse-monitoring',
+    '/admin/finance/subscription-billing', '/admin/finance/invoices', '/admin/finance/revenue', '/admin/finance/taxes',
+    '/admin/reports/platform', '/admin/reports/shipment-analytics', '/admin/reports/revenue-analytics', '/admin/reports/sla',
+    '/admin/workflow/custom-fields', '/admin/workflow/custom-statuses', '/admin/workflow/builder',
+    '/admin/workflow/email-templates', '/admin/workflow/notification-templates',
+    '/admin/system/settings', '/admin/system/integrations', '/admin/system/api-config', '/admin/system/security',
+    '/admin/audit/logs', '/admin/audit/error-logs', '/admin/audit/access-logs', '/admin/audit/system-activity',
+  ],
+  CompanyAdmin: [
+    '/company/dashboard',
+    '/company/shipments', '/company/orders', '/company/bol', '/company/container-tracking',
+    '/company/dispatch', '/company/drivers', '/company/fleet',
+    '/company/warehouse', '/company/inventory',
+    '/company/customers', '/company/agents',
+    '/company/finance/invoices', '/company/finance/payments', '/company/finance/expenses',
+    '/company/reports/shipments', '/company/reports/revenue', '/company/reports/performance',
+    '/company/users', '/company/roles', '/company/notifications', '/company/settings',
+  ],
+  Manager: [
+    '/manager/dashboard',
+    '/manager/shipments', '/manager/orders', '/manager/bol',
+    '/manager/dispatch', '/manager/drivers', '/manager/fleet',
+    '/manager/warehouse',
+    '/manager/customers',
+    '/manager/reports/shipments', '/manager/reports/performance', '/manager/reports/sla',
+    '/manager/notifications', '/manager/settings',
+  ],
+  Dispatcher: [
+    '/ops/dashboard',
+    '/ops/shipments', '/ops/container-tracking',
+    '/ops/dispatch', '/ops/drivers', '/ops/fleet',
+    '/ops/notifications',
+  ],
+  Operator: [
+    '/ops/dashboard',
+    '/ops/shipments', '/ops/container-tracking',
+    '/ops/dispatch', '/ops/drivers', '/ops/fleet',
+    '/ops/notifications',
+  ],
+  Agent: [
+    '/agent/dashboard',
+    '/agent/shipments', '/agent/orders',
+    '/agent/warehouse',
+    '/agent/customers',
+    '/agent/finance/invoices', '/agent/finance/payments',
+    '/agent/reports',
+    '/agent/notifications',
+  ],
+  Staff: [
+    '/staff/dashboard',
+    '/staff/shipments', '/staff/orders',
+    '/staff/customers',
+    '/staff/warehouse',
+    '/staff/finance/invoices',
+    '/staff/reports',
+    '/staff/notifications',
+  ],
+};
+
 // Role-based permissions
 export const rolePermissions: Record<UserRole, Record<string, { view: boolean; create: boolean; edit: boolean; delete: boolean }>> = {
   'SuperAdmin': {

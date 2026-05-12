@@ -35,7 +35,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const { login } = useAuth();
+  const { login, getDashboardRoute } = useAuth();
   const router = useRouter();
 
   // Cursor ring refs — outer ring lags behind
@@ -196,7 +196,7 @@ export default function LoginPage() {
     try {
       const response = await login(username, password);
       if (response.success) {
-        router.push('/dashboard');
+        router.push(getDashboardRoute());
       } else {
         setError(response.error || 'Invalid credentials');
       }

@@ -1,6 +1,17 @@
 import { APP_CONFIG } from "@/config/appConfig";
 import { mockUsers, type User } from "@/data/mockData";
 
+export const ROLE_DASHBOARD_MAP = {
+  SuperAdmin:   '/admin/dashboard',
+  CompanyAdmin: '/company/dashboard',
+  Manager:      '/manager/dashboard',
+  Dispatcher:   '/ops/dashboard',
+  Operator:     '/ops/dashboard',
+  Agent:        '/agent/dashboard',
+  Staff:        '/staff/dashboard',
+  Admin:        '/admin/dashboard',
+};
+
 export interface LoginCredentials {
   username: string;
   password: string;
