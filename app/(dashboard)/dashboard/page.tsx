@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { KPICard } from '@/components/shared/KPICard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -22,13 +23,19 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
 
   useEffect(() => {
+    // Redirect SuperAdmin to their dedicated dashboard
+    if (isSuperAdmin) {
+      router.push('/admin/dashboard');
+      return;
+    }
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isSuperAdmin, router]);
 
   const { kpiSummary, shipmentTrend, statusDistribution, monthlyRevenue } = mockAnalytics;
   const recentShipments = mockShipments.slice(0, 5);

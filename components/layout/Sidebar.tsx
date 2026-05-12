@@ -16,6 +16,13 @@ import Image from 'next/image';
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+  // Super Admin only
+  { id: 'companies', label: 'Companies', icon: Package, href: '/companies' },
+  // Company Admin & Manager
+  { id: 'organizations', label: 'Organizations', icon: Truck, href: '/organizations' },
+  { id: 'agents', label: 'Agents', icon: Users, href: '/agents' },
+  { id: 'transport', label: 'Transport', icon: MapPin, href: '/transport' },
+  // Operational modules
   { id: 'shipments', label: 'Shipments', icon: Package, href: '/shipments' },
   { id: 'orders', label: 'Orders', icon: ShoppingCart, href: '/orders' },
   { id: 'fleet', label: 'Fleet', icon: Truck, href: '/fleet' },
