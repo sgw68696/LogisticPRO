@@ -1,13 +1,137 @@
 // MOCK DATA FOR LOGISTICS MANAGEMENT SYSTEM
 
-// Types
+// MULTI-TENANCY & ENTERPRISE TYPES
+export type CompanyStatus = 'Active' | 'Pending' | 'Suspended' | 'Inactive';
+export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
+export type UserRole = 'SuperAdmin' | 'CompanyAdmin' | 'Manager' | 'Dispatcher' | 'Agent' | 'Staff' | 'Operator' | 'Admin';
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+
+// LOGISTICS OPERATION TYPES
 export type ShipmentStatus = 'Pending' | 'Picked Up' | 'In Transit' | 'Out for Delivery' | 'Delivered' | 'Cancelled' | 'Failed';
 export type OrderStatus = 'Draft' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Returned';
 export type PaymentStatus = 'Pending' | 'Paid' | 'Partial' | 'Refunded';
 export type VehicleStatus = 'Available' | 'On Route' | 'Maintenance' | 'Inactive';
 export type DriverStatus = 'Active' | 'On Duty' | 'Off Duty' | 'Suspended';
 export type InvoiceStatus = 'Unpaid' | 'Paid' | 'Overdue' | 'Cancelled';
-export type UserRole = 'Admin' | 'Manager' | 'Dispatcher' | 'Staff';
+
+// MULTI-TENANCY INTERFACES
+export interface Company {
+  id: string;
+  name: string;
+  registrationType: 'self-service' | 'admin-created';
+  registrationStatus: RegistrationStatus;
+  status: CompanyStatus;
+  email: string;
+  phone: string;
+  registeredAddress: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  taxId: string;
+  businessType: 'Freight' | 'Express' | 'Courier' | 'Logistics' | 'Mixed';
+  registrationDate: string;
+  approvalDate: string | null;
+  approvedBy: string | null; // SuperAdmin user ID
+  logo: string | null;
+  website: string | null;
+  contactPerson: string;
+  contactPhone: string;
+  maxOrganizations: number;
+  maxAgents: number;
+  currentOrganizations: number;
+  currentAgents: number;
+  billingCycle: 'Monthly' | 'Quarterly' | 'Yearly';
+  plan: 'Starter' | 'Professional' | 'Enterprise';
+  documents: { type: string; url: string; verified: boolean; uploadedAt: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Organization {
+  id: string;
+  companyId: string;
+  name: string;
+  type: 'Regional' | 'Department' | 'Branch' | 'Division';
+  status: CompanyStatus;
+  parentOrganizationId: string | null;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  managerId: string;
+  agentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransportType {
+  id: string;
+  companyId: string;
+  name: 'Land' | 'Air' | 'Water';
+  status: 'Active' | 'Inactive';
+  createdAt: string;
+}
+
+export interface TransportCategory {
+  id: string;
+  companyId: string;
+  transportTypeId: string;
+  name: string;
+  description: string;
+  specifications: Record<string, string | number | boolean>;
+  capacity: number;
+  capacityUnit: 'kg' | 'cubic_meters' | 'tons' | 'units';
+  maxSpeed: number | null;
+  fuelType: string | null;
+  createdAt: string;
+}
+
+export interface TransportItem {
+  id: string;
+  companyId: string;
+  categoryId: string;
+  name: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  specification: Record<string, string | number>;
+  price: number;
+  createdAt: string;
+}
+
+export interface Agent {
+  id: string;
+  companyId: string;
+  organizationId: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  username: string;
+  status: 'Active' | 'Inactive' | 'Suspended';
+  roleAssignments: AgentRole[];
+  createdAt: string;
+  createdBy: string; // User ID who created this agent
+  updatedAt: string;
+}
+
+export interface AgentRole {
+  id: string;
+  agentId: string;
+  roleType: UserRole;
+  permissions: AgentPermission[];
+  assignedAt: string;
+  assignedBy: string; // User ID
+  scope: 'company' | 'organization' | 'department'; // Scope of the role
+  scopeId: string | null; // Company/Organization/Department ID
+}
+
+export interface AgentPermission {
+  module: string;
+  action: PermissionAction;
+  allowed: boolean;
+  grantedAt: string;
+}
 
 export interface Shipment {
   id: string;
@@ -146,6 +270,10 @@ export interface User {
   lastLogin: string;
   createdAt: string;
   avatar: string;
+  // Multi-tenancy fields
+  companyId: string | null; // null for SuperAdmin
+  organizationId: string | null; // null for SuperAdmin/CompanyAdmin
+  agentId: string | null; // Links to Agent record for non-admin users
 }
 
 export interface Notification {
@@ -182,7 +310,210 @@ const addresses = [
   '741 C-Scheme, MI Road'
 ];
 
-// MOCK USERS (8 users - one per role)
+// ============================================
+// MOCK COMPANIES (Multi-tenancy)
+// ============================================
+export const mockCompanies: Company[] = [
+  {
+    id: 'cmp-001',
+    name: 'TechLogistics India',
+    registrationType: 'self-service',
+    registrationStatus: 'Approved',
+    status: 'Active',
+    email: 'admin@techlogistics.com',
+    phone: '+91 9876543210',
+    registeredAddress: '123 Business Park, MG Road',
+    city: 'Bangalore',
+    state: 'Karnataka',
+    pincode: '560001',
+    country: 'India',
+    taxId: 'TAX123456',
+    businessType: 'Logistics',
+    registrationDate: '2024-06-15T00:00:00Z',
+    approvalDate: '2024-06-20T00:00:00Z',
+    approvedBy: 'usr-001',
+    logo: null,
+    website: 'https://techlogistics.com',
+    contactPerson: 'Rajesh Kumar',
+    contactPhone: '+91 9876543210',
+    maxOrganizations: 5,
+    maxAgents: 50,
+    currentOrganizations: 2,
+    currentAgents: 15,
+    billingCycle: 'Monthly',
+    plan: 'Professional',
+    documents: [
+      { type: 'registration', url: '/docs/reg-001.pdf', verified: true, uploadedAt: '2024-06-15T00:00:00Z' },
+      { type: 'tax', url: '/docs/tax-001.pdf', verified: true, uploadedAt: '2024-06-15T00:00:00Z' }
+    ],
+    createdAt: '2024-06-15T00:00:00Z',
+    updatedAt: '2024-06-20T00:00:00Z'
+  },
+  {
+    id: 'cmp-002',
+    name: 'Global Express Cargo',
+    registrationType: 'self-service',
+    registrationStatus: 'Submitted',
+    status: 'Pending',
+    email: 'contact@globalexpress.com',
+    phone: '+91 8765432109',
+    registeredAddress: '456 Trade Centre, Airport Road',
+    city: 'Delhi',
+    state: 'Delhi',
+    pincode: '110001',
+    country: 'India',
+    taxId: 'TAX654321',
+    businessType: 'Express',
+    registrationDate: '2024-09-10T00:00:00Z',
+    approvalDate: null,
+    approvedBy: null,
+    logo: null,
+    website: 'https://globalexpress.com',
+    contactPerson: 'Priya Sharma',
+    contactPhone: '+91 8765432109',
+    maxOrganizations: 3,
+    maxAgents: 30,
+    currentOrganizations: 0,
+    currentAgents: 0,
+    billingCycle: 'Quarterly',
+    plan: 'Starter',
+    documents: [
+      { type: 'registration', url: '/docs/reg-002.pdf', verified: true, uploadedAt: '2024-09-10T00:00:00Z' }
+    ],
+    createdAt: '2024-09-10T00:00:00Z',
+    updatedAt: '2024-09-10T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK ORGANIZATIONS
+// ============================================
+export const mockOrganizations: Organization[] = [
+  {
+    id: 'org-001',
+    companyId: 'cmp-001',
+    name: 'Bangalore Regional Office',
+    type: 'Regional',
+    status: 'Active',
+    parentOrganizationId: null,
+    address: '123 Business Park, MG Road',
+    city: 'Bangalore',
+    state: 'Karnataka',
+    pincode: '560001',
+    managerId: 'usr-002',
+    agentCount: 8,
+    createdAt: '2024-06-20T00:00:00Z',
+    updatedAt: '2024-06-20T00:00:00Z'
+  },
+  {
+    id: 'org-002',
+    companyId: 'cmp-001',
+    name: 'Mumbai Distribution Centre',
+    type: 'Branch',
+    status: 'Active',
+    parentOrganizationId: null,
+    address: '789 Logistics Hub, JVLR',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    pincode: '400051',
+    managerId: 'usr-003',
+    agentCount: 7,
+    createdAt: '2024-07-01T00:00:00Z',
+    updatedAt: '2024-07-01T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK AGENTS
+// ============================================
+export const mockAgents: Agent[] = [
+  {
+    id: 'agt-001',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    name: 'Priya Sharma',
+    email: 'priya.sharma@techlogistics.com',
+    phone: '+91 9876543211',
+    username: 'priya_ops',
+    status: 'Active',
+    roleAssignments: [
+      {
+        id: 'rl-001',
+        agentId: 'agt-001',
+        roleType: 'Manager',
+        permissions: [
+          { module: 'shipments', action: 'view', allowed: true, grantedAt: '2024-06-20T00:00:00Z' },
+          { module: 'shipments', action: 'create', allowed: true, grantedAt: '2024-06-20T00:00:00Z' },
+          { module: 'shipments', action: 'edit', allowed: true, grantedAt: '2024-06-20T00:00:00Z' }
+        ],
+        assignedAt: '2024-06-20T00:00:00Z',
+        assignedBy: 'usr-001',
+        scope: 'organization',
+        scopeId: 'org-001'
+      }
+    ],
+    createdAt: '2024-06-20T00:00:00Z',
+    createdBy: 'usr-001',
+    updatedAt: '2024-06-20T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK TRANSPORT TYPES & CATEGORIES
+// ============================================
+export const mockTransportTypes: TransportType[] = [
+  { id: 'tt-001', companyId: 'cmp-001', name: 'Land', status: 'Active', createdAt: '2024-06-20T00:00:00Z' },
+  { id: 'tt-002', companyId: 'cmp-001', name: 'Air', status: 'Active', createdAt: '2024-06-20T00:00:00Z' },
+  { id: 'tt-003', companyId: 'cmp-001', name: 'Water', status: 'Active', createdAt: '2024-06-20T00:00:00Z' }
+];
+
+export const mockTransportCategories: TransportCategory[] = [
+  {
+    id: 'tc-001',
+    companyId: 'cmp-001',
+    transportTypeId: 'tt-001',
+    name: 'Heavy Truck',
+    description: 'Large cargo trucks for long-distance freight',
+    specifications: { axles: 3, length: '20m', width: '2.5m', height: '3m' },
+    capacity: 25000,
+    capacityUnit: 'kg',
+    maxSpeed: 100,
+    fuelType: 'Diesel',
+    createdAt: '2024-06-20T00:00:00Z'
+  },
+  {
+    id: 'tc-002',
+    companyId: 'cmp-001',
+    transportTypeId: 'tt-003',
+    name: 'Container Ship',
+    description: 'Large container cargo ship for international trade',
+    specifications: { containerCapacity: 10000, draughtDraft: '12.5m', length: '280m' },
+    capacity: 500000,
+    capacityUnit: 'tons',
+    maxSpeed: null,
+    fuelType: 'Bunker Oil',
+    createdAt: '2024-06-20T00:00:00Z'
+  }
+];
+
+export const mockTransportItems: TransportItem[] = [
+  {
+    id: 'ti-001',
+    companyId: 'cmp-001',
+    categoryId: 'tc-001',
+    name: 'Tire Set',
+    description: 'Set of 10 truck tires for heavy vehicles',
+    quantity: 50,
+    unit: 'set',
+    specification: { brand: 'Bridgestone', type: 'All-terrain', size: '295/80R22.5' },
+    price: 15000,
+    createdAt: '2024-06-20T00:00:00Z'
+  }
+];
+
+// ============================================
+// MOCK USERS (Updated with multi-tenancy)
+// ============================================
 export const mockUsers: User[] = [
   {
     id: 'usr-001',
@@ -191,102 +522,126 @@ export const mockUsers: User[] = [
     name: 'Rajesh Kumar',
     email: 'rajesh.kumar@logisticspro.com',
     phone: '+91 98765 43210',
-    role: 'Admin',
+    role: 'SuperAdmin',
     status: 'Active',
     lastLogin: '2025-01-15T09:30:00Z',
     createdAt: '2024-01-01T00:00:00Z',
-    avatar: 'RK'
+    avatar: 'RK',
+    companyId: null,
+    organizationId: null,
+    agentId: null
   },
   {
     id: 'usr-002',
     username: 'ops_manager',
     password: 'ops123',
     name: 'Priya Sharma',
-    email: 'priya.sharma@logisticspro.com',
+    email: 'priya.sharma@techlogistics.com',
     phone: '+91 98765 43211',
     role: 'Manager',
     status: 'Active',
     lastLogin: '2025-01-15T08:45:00Z',
     createdAt: '2024-02-15T00:00:00Z',
-    avatar: 'PS'
+    avatar: 'PS',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: 'agt-001'
   },
   {
     id: 'usr-003',
     username: 'dispatch',
     password: 'dispatch123',
     name: 'Amit Patel',
-    email: 'amit.patel@logisticspro.com',
+    email: 'amit.patel@techlogistics.com',
     phone: '+91 98765 43212',
     role: 'Dispatcher',
     status: 'Active',
     lastLogin: '2025-01-15T07:00:00Z',
     createdAt: '2024-03-10T00:00:00Z',
-    avatar: 'AP'
+    avatar: 'AP',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    agentId: null
   },
   {
     id: 'usr-004',
     username: 'warehouse',
     password: 'warehouse123',
     name: 'Sunita Reddy',
-    email: 'sunita.reddy@logisticspro.com',
+    email: 'sunita.reddy@techlogistics.com',
     phone: '+91 98765 43213',
-    role: 'Staff',
+    role: 'Agent',
     status: 'Active',
     lastLogin: '2025-01-14T18:00:00Z',
     createdAt: '2024-04-05T00:00:00Z',
-    avatar: 'SR'
+    avatar: 'SR',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: null
   },
   {
     id: 'usr-005',
     username: 'driver01',
     password: 'driver123',
     name: 'Mohammed Khan',
-    email: 'mohammed.khan@logisticspro.com',
+    email: 'mohammed.khan@techlogistics.com',
     phone: '+91 98765 43214',
-    role: 'Staff',
+    role: 'Agent',
     status: 'Active',
     lastLogin: '2025-01-15T06:00:00Z',
     createdAt: '2024-05-20T00:00:00Z',
-    avatar: 'MK'
+    avatar: 'MK',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: null
   },
   {
     id: 'usr-006',
     username: 'finance',
     password: 'finance123',
     name: 'Ananya Gupta',
-    email: 'ananya.gupta@logisticspro.com',
+    email: 'ananya.gupta@techlogistics.com',
     phone: '+91 98765 43215',
-    role: 'Staff',
+    role: 'Agent',
     status: 'Active',
     lastLogin: '2025-01-15T10:00:00Z',
     createdAt: '2024-06-12T00:00:00Z',
-    avatar: 'AG'
+    avatar: 'AG',
+    companyId: 'cmp-001',
+    organizationId: 'org-001',
+    agentId: null
   },
   {
     id: 'usr-007',
     username: 'support',
     password: 'support123',
     name: 'Vikram Singh',
-    email: 'vikram.singh@logisticspro.com',
+    email: 'vikram.singh@techlogistics.com',
     phone: '+91 98765 43216',
     role: 'Staff',
     status: 'Active',
     lastLogin: '2025-01-15T09:00:00Z',
     createdAt: '2024-07-08T00:00:00Z',
-    avatar: 'VS'
+    avatar: 'VS',
+    companyId: 'cmp-001',
+    organizationId: 'org-002',
+    agentId: null
   },
   {
     id: 'usr-008',
-    username: 'customer01',
+    username: 'company_admin',
     password: 'cust123',
-    name: 'Neha Enterprises',
-    email: 'contact@nehaenterprises.com',
+    name: 'Vikram Sharma',
+    email: 'admin@techlogistics.com',
     phone: '+91 98765 43217',
-    role: 'Staff',
+    role: 'CompanyAdmin',
     status: 'Active',
     lastLogin: '2025-01-14T14:30:00Z',
     createdAt: '2024-08-01T00:00:00Z',
-    avatar: 'NE'
+    avatar: 'VS',
+    companyId: 'cmp-001',
+    organizationId: null,
+    agentId: null
   }
 ];
 
@@ -665,15 +1020,29 @@ export const mockAnalytics = {
 
 // Role-based menu configuration
 export const roleMenuConfig: Record<UserRole, string[]> = {
-  'Admin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'finance', 'reports', 'notifications', 'users', 'settings'],
+  'SuperAdmin': ['dashboard', 'companies', 'organizations', 'fleet', 'dispatch', 'reports', 'users', 'settings'],
+  'CompanyAdmin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'agents', 'transport', 'finance', 'reports', 'notifications', 'settings'],
   'Manager': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'reports', 'notifications', 'settings'],
   'Dispatcher': ['dashboard', 'shipments', 'dispatch', 'drivers', 'fleet', 'notifications'],
+  'Agent': ['dashboard', 'shipments', 'orders', 'customers', 'finance', 'warehouse', 'reports', 'notifications'],
   'Staff': ['dashboard', 'shipments', 'orders', 'customers', 'finance', 'warehouse', 'reports', 'notifications'],
+  'Operator': ['dashboard', 'shipments', 'dispatch', 'drivers', 'fleet', 'notifications'],
+  'Admin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'finance', 'reports', 'notifications', 'users', 'settings'],
 };
 
 // Role-based permissions
 export const rolePermissions: Record<UserRole, Record<string, { view: boolean; create: boolean; edit: boolean; delete: boolean }>> = {
-  'Admin': {
+  'SuperAdmin': {
+    companies: { view: true, create: true, edit: true, delete: true },
+    organizations: { view: true, create: true, edit: true, delete: true },
+    dashboard: { view: true, create: false, edit: false, delete: false },
+    fleet: { view: true, create: false, edit: false, delete: false },
+    dispatch: { view: true, create: false, edit: false, delete: false },
+    reports: { view: true, create: true, edit: false, delete: false },
+    users: { view: true, create: true, edit: true, delete: true },
+    settings: { view: true, create: true, edit: true, delete: true },
+  },
+  'CompanyAdmin': {
     shipments: { view: true, create: true, edit: true, delete: true },
     orders: { view: true, create: true, edit: true, delete: true },
     fleet: { view: true, create: true, edit: true, delete: true },
@@ -681,6 +1050,8 @@ export const rolePermissions: Record<UserRole, Record<string, { view: boolean; c
     dispatch: { view: true, create: true, edit: true, delete: true },
     warehouse: { view: true, create: true, edit: true, delete: true },
     customers: { view: true, create: true, edit: true, delete: true },
+    agents: { view: true, create: true, edit: true, delete: true },
+    transport: { view: true, create: true, edit: true, delete: true },
     finance: { view: true, create: true, edit: true, delete: true },
     reports: { view: true, create: true, edit: true, delete: true },
     users: { view: true, create: true, edit: true, delete: true },
@@ -712,6 +1083,19 @@ export const rolePermissions: Record<UserRole, Record<string, { view: boolean; c
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: false, create: false, edit: false, delete: false },
   },
+  'Agent': {
+    shipments: { view: true, create: true, edit: true, delete: false },
+    orders: { view: true, create: true, edit: true, delete: false },
+    fleet: { view: false, create: false, edit: false, delete: false },
+    drivers: { view: false, create: false, edit: false, delete: false },
+    dispatch: { view: false, create: false, edit: false, delete: false },
+    warehouse: { view: true, create: true, edit: true, delete: false },
+    customers: { view: true, create: true, edit: true, delete: false },
+    finance: { view: true, create: false, edit: false, delete: false },
+    reports: { view: true, create: false, edit: false, delete: false },
+    users: { view: false, create: false, edit: false, delete: false },
+    settings: { view: false, create: false, edit: false, delete: false },
+  },
   'Staff': {
     shipments: { view: true, create: true, edit: true, delete: false },
     orders: { view: true, create: true, edit: true, delete: false },
@@ -724,5 +1108,31 @@ export const rolePermissions: Record<UserRole, Record<string, { view: boolean; c
     reports: { view: true, create: false, edit: false, delete: false },
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: false, create: false, edit: false, delete: false },
+  },
+  'Operator': {
+    shipments: { view: true, create: false, edit: true, delete: false },
+    orders: { view: true, create: false, edit: false, delete: false },
+    fleet: { view: true, create: false, edit: false, delete: false },
+    drivers: { view: true, create: false, edit: false, delete: false },
+    dispatch: { view: true, create: true, edit: true, delete: false },
+    warehouse: { view: false, create: false, edit: false, delete: false },
+    customers: { view: false, create: false, edit: false, delete: false },
+    finance: { view: false, create: false, edit: false, delete: false },
+    reports: { view: false, create: false, edit: false, delete: false },
+    users: { view: false, create: false, edit: false, delete: false },
+    settings: { view: false, create: false, edit: false, delete: false },
+  },
+  'Admin': {
+    shipments: { view: true, create: true, edit: true, delete: true },
+    orders: { view: true, create: true, edit: true, delete: true },
+    fleet: { view: true, create: true, edit: true, delete: true },
+    drivers: { view: true, create: true, edit: true, delete: true },
+    dispatch: { view: true, create: true, edit: true, delete: true },
+    warehouse: { view: true, create: true, edit: true, delete: true },
+    customers: { view: true, create: true, edit: true, delete: true },
+    finance: { view: true, create: true, edit: true, delete: true },
+    reports: { view: true, create: true, edit: true, delete: true },
+    users: { view: true, create: true, edit: true, delete: true },
+    settings: { view: true, create: true, edit: true, delete: true },
   },
 };

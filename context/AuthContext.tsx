@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as loginService, logout as logoutService, type AuthResponse } from '@/services/authService';
-import { roleMenuConfig, rolePermissions, type User, type UserRole } from '@/data/mockData';
+import { roleMenuConfig, rolePermissions, type User, type UserRole, type PermissionAction } from '@/data/mockData';
 
 interface AuthContextType {
   user: User | null;
@@ -10,8 +10,14 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
-  hasPermission: (module: string, action: 'view' | 'create' | 'edit' | 'delete') => boolean;
+  hasPermission: (module: string, action: PermissionAction) => boolean;
   allowedMenuItems: string[];
+  isSuperAdmin: boolean;
+  isCompanyAdmin: boolean;
+  canManageUsers: boolean;
+  canManageAgents: boolean;
+  getCurrentCompanyId: () => string | null;
+  getCurrentOrganizationId: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,13 +66,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const hasPermission = useCallback((module: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean => {
+  const hasPermission = useCallback((module: string, action: PermissionAction): boolean => {
     if (!user) return false;
     const permissions = rolePermissions[user.role as UserRole];
     return permissions?.[module]?.[action] ?? false;
   }, [user]);
 
   const allowedMenuItems = user ? roleMenuConfig[user.role as UserRole] || [] : [];
+  
+  const isSuperAdmin = user?.role === 'SuperAdmin';
+  const isCompanyAdmin = user?.role === 'CompanyAdmin';
+  const canManageUsers = isSuperAdmin || isCompanyAdmin;
+  const canManageAgents = isCompanyAdmin || user?.role === 'Manager';
+  
+  const getCurrentCompanyId = useCallback(() => user?.companyId || null, [user]);
+  const getCurrentOrganizationId = useCallback(() => user?.organizationId || null, [user]);
 
   return (
     <AuthContext.Provider
@@ -78,6 +92,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         hasPermission,
         allowedMenuItems,
+        isSuperAdmin,
+        isCompanyAdmin,
+        canManageUsers,
+        canManageAgents,
+        getCurrentCompanyId,
+        getCurrentOrganizationId,
       }}
     >
       {children}
