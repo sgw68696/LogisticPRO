@@ -9,13 +9,15 @@ import Image from 'next/image';
 import AnimatedLogo from '../Animatedlogo';
 const demoCredentials = [
   { role: 'Super Admin', username: 'superadmin', password: 'admin123' },
-  { role: 'Ops Manager', username: 'ops_manager', password: 'ops123' },
-  { role: 'Dispatch', username: 'dispatch', password: 'dispatch123' },
-  { role: 'Warehouse', username: 'warehouse', password: 'warehouse123' },
-  { role: 'Driver', username: 'driver01', password: 'driver123' },
-  { role: 'Finance', username: 'finance', password: 'finance123' },
-  { role: 'Support', username: 'support', password: 'support123' },
-  { role: 'Customer', username: 'customer01', password: 'cust123' },
+  { role: 'Company Admin', username: 'company_admin', password: 'admin123' },
+  { role: 'Manager', username: 'ops_manager', password: 'ops123' },
+  { role: 'Dispatcher', username: 'dispatch', password: 'dispatch123' },
+  { role: 'Agent (Warehouse)', username: 'warehouse', password: 'warehouse123' },
+  { role: 'Agent (Driver)', username: 'driver01', password: 'driver123' },
+  { role: 'Agent (Finance)', username: 'finance', password: 'finance123' },
+  { role: 'Staff', username: 'support', password: 'support123' },
+  { role: 'Operator', username: 'operator01', password: 'operator123' },
+  { role: 'Staff (Additional)', username: 'staff01', password: 'staff123' },
 ];
 
 const stats = [
