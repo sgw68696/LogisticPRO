@@ -14,15 +14,15 @@ import { mockUsers, type UserRole } from '@/data/mockData';
 const roleBadgeVariants: Record<UserRole, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   SuperAdmin: 'destructive',
   CompanyAdmin: 'default',
-  Manager: 'secondary',
-  Dispatcher: 'outline',
-  Operator: 'outline',
-  Agent: 'secondary',
-  Staff: 'outline',
-  CustomsAgent: 'secondary',
-  PortAgent: 'secondary',
+  Manager: 'default',
+  Dispatcher: 'default',
+  Operator: 'default',
+  Agent: 'default',
+  Staff: 'default',
+  CustomsAgent: 'default',
+  PortAgent: 'default',
   CustomerPortal: 'default',
-  AuditorReadOnly: 'outline',
+  AuditorReadOnly: 'default',
 };
 
 const stats = [
