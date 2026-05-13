@@ -122,7 +122,7 @@ export const agentService = {
         updatedAt: new Date().toISOString(),
       };
       
-      (mockAgents as any).push(newAgent);
+      mockAgents.push(newAgent);
       return { success: true, agentId: newAgent.id };
     }
     
@@ -326,11 +326,19 @@ function getDefaultPermissions(roleType: UserRole): AgentPermission[] {
       { module: 'shipments', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
       { module: 'dispatch', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
     ],
-    'Admin': [
+    'CustomsAgent': [
+      { module: 'compliance', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
+      { module: 'documents', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
+    ],
+    'PortAgent': [
       { module: 'shipments', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
-      { module: 'shipments', action: 'create', allowed: true, grantedAt: new Date().toISOString() },
-      { module: 'shipments', action: 'edit', allowed: true, grantedAt: new Date().toISOString() },
-      { module: 'shipments', action: 'delete', allowed: true, grantedAt: new Date().toISOString() },
+      { module: 'documents', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
+    ],
+    'CustomerPortal': [
+      { module: 'shipments', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
+    ],
+    'AuditorReadOnly': [
+      { module: 'reports', action: 'view', allowed: true, grantedAt: new Date().toISOString() },
     ],
   };
   

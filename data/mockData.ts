@@ -3,7 +3,11 @@
 // MULTI-TENANCY & ENTERPRISE TYPES
 export type CompanyStatus = 'Active' | 'Pending' | 'Suspended' | 'Inactive';
 export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
-export type UserRole = 'SuperAdmin' | 'CompanyAdmin' | 'Manager' | 'Dispatcher' | 'Agent' | 'Staff' | 'Operator' | 'Admin';
+export type UserRole =
+  | 'SuperAdmin' | 'CompanyAdmin' | 'Manager'
+  | 'Dispatcher' | 'Operator' | 'Agent' | 'Staff'
+  | 'CustomsAgent' | 'PortAgent' | 'CustomerPortal' | 'AuditorReadOnly';
+export type AgentType = 'warehouse' | 'driver' | 'finance';
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
 
 // LOGISTICS OPERATION TYPES
@@ -529,23 +533,27 @@ export interface Invoice {
   createdAt: string;
 }
 
-export interface User {
+export interface MockUser {
   id: string;
+  name: string;
   username: string;
   password: string;
-  name: string;
   email: string;
   phone: string;
   role: UserRole;
+  agentType?: AgentType;
   status: 'Active' | 'Inactive';
+  companyId: string | null;
+  organizationId: string | null;
+  agentId: string | null;
+  avatar: string;
+  dashboardRoute: string;
+  menuAccess: string[];
   lastLogin: string;
   createdAt: string;
-  avatar: string;
-  // Multi-tenancy fields
-  companyId: string | null; // null for SuperAdmin
-  organizationId: string | null; // null for SuperAdmin/CompanyAdmin
-  agentId: string | null; // Links to Agent record for non-admin users
 }
+
+export type User = MockUser;
 
 export interface Notification {
   id: string;
@@ -782,169 +790,273 @@ export const mockTransportItems: TransportItem[] = [
   }
 ];
 
+export const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
+  SuperAdmin:      '/admin/dashboard',
+  CompanyAdmin:    '/company/dashboard',
+  Manager:         '/manager/dashboard',
+  Dispatcher:      '/ops/dashboard',
+  Operator:        '/ops/dashboard',
+  Agent:           '/agent/dashboard',
+  Staff:           '/staff/dashboard',
+  CustomsAgent:    '/customs/dashboard',
+  PortAgent:       '/port/dashboard',
+  CustomerPortal:  '/portal/dashboard',
+  AuditorReadOnly: '/audit/dashboard',
+};
+
+export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
+  SuperAdmin: [
+    '/admin/dashboard',
+    '/admin/org/companies', '/admin/org/organizations', '/admin/org/company-types',
+    '/admin/org/subscription-plans', '/admin/org/approvals',
+    '/admin/users/all', '/admin/users/roles', '/admin/users/rbac-matrix', '/admin/users/login-activity',
+    '/admin/logistics/carriers', '/admin/logistics/ports', '/admin/logistics/airports',
+    '/admin/logistics/container-types', '/admin/logistics/incoterms', '/admin/logistics/transport-modes',
+    '/admin/logistics/hs-codes', '/admin/logistics/restrictions', '/admin/logistics/dg-rules',
+    '/admin/ops/shipments', '/admin/ops/live-map', '/admin/ops/container-tracking',
+    '/admin/ops/bol-monitoring', '/admin/ops/carrier-tracking', '/admin/ops/dispatch-monitoring',
+    '/admin/ops/fleet-monitoring', '/admin/ops/warehouse-monitoring', '/admin/ops/sla-alerts',
+    '/admin/bookings', '/admin/rates/cards', '/admin/rates/contracts',
+    '/admin/compliance/customs', '/admin/compliance/licenses', '/admin/compliance/reports',
+    '/admin/finance/subscription-billing', '/admin/finance/invoices', '/admin/finance/revenue', '/admin/finance/taxes',
+    '/admin/reports/platform', '/admin/reports/shipment-analytics', '/admin/reports/revenue-analytics',
+    '/admin/reports/carrier-performance', '/admin/reports/warehouse', '/admin/reports/sla',
+    '/admin/workflow/custom-fields', '/admin/workflow/custom-statuses', '/admin/workflow/builder',
+    '/admin/workflow/email-templates', '/admin/workflow/notification-templates', '/admin/workflow/document-types',
+    '/admin/system/settings', '/admin/system/integrations', '/admin/system/api-config', '/admin/system/security',
+    '/admin/audit/logs', '/admin/audit/error-logs', '/admin/audit/access-logs', '/admin/audit/system-activity',
+  ],
+  CompanyAdmin: [
+    '/company/dashboard',
+    '/company/bookings/new', '/company/bookings/requests', '/company/bookings',
+    '/company/rates/cards', '/company/rates/spot', '/company/rates/contracts',
+    '/company/shipments', '/company/orders', '/company/bol', '/company/container-tracking',
+    '/company/live-map', '/company/sla-alerts',
+    '/company/documents', '/company/documents/bol', '/company/documents/packing-lists',
+    '/company/documents/commercial-invoices', '/company/documents/coo',
+    '/company/documents/insurance', '/company/documents/pod',
+    '/company/compliance/customs', '/company/compliance/hs-codes',
+    '/company/compliance/licenses', '/company/compliance/dg',
+    '/company/dispatch', '/company/drivers', '/company/fleet',
+    '/company/fleet/driver-docs', '/company/fleet/vehicle-docs', '/company/fleet/live-map',
+    '/company/fleet/trips', '/company/fleet/maintenance', '/company/fleet/fuel',
+    '/company/warehouse/inbound', '/company/warehouse/outbound', '/company/warehouse/stock',
+    '/company/warehouse/locations', '/company/warehouse/cycle-count',
+    '/company/warehouse/damage', '/company/warehouse/cold-chain', '/company/inventory',
+    '/company/customers', '/company/agents',
+    '/company/finance/invoices', '/company/finance/payments',
+    '/company/finance/expenses', '/company/finance/reconciliation',
+    '/company/reports/shipments', '/company/reports/revenue', '/company/reports/performance',
+    '/company/reports/carrier-performance', '/company/reports/warehouse',
+    '/company/users', '/company/roles', '/company/notifications', '/company/settings',
+  ],
+  Manager: [
+    '/manager/dashboard',
+    '/manager/bookings/new', '/manager/bookings', '/manager/rates/cards',
+    '/manager/shipments', '/manager/orders', '/manager/bol',
+    '/manager/live-map', '/manager/sla-alerts', '/manager/documents',
+    '/manager/dispatch', '/manager/drivers', '/manager/fleet',
+    '/manager/fleet/live-map', '/manager/fleet/trips', '/manager/fleet/maintenance', '/manager/fleet/fuel',
+    '/manager/warehouse/inbound', '/manager/warehouse/outbound',
+    '/manager/warehouse/stock', '/manager/warehouse/damage',
+    '/manager/customers',
+    '/manager/compliance/customs', '/manager/compliance/dg',
+    '/manager/finance/overview',
+    '/manager/reports/shipments', '/manager/reports/performance',
+    '/manager/reports/carrier-performance', '/manager/reports/sla',
+    '/manager/notifications', '/manager/settings',
+  ],
+  Dispatcher: [
+    '/ops/dashboard',
+    '/ops/shipments', '/ops/container-tracking', '/ops/sla-alerts',
+    '/ops/dispatch', '/ops/drivers', '/ops/fleet',
+    '/ops/live-map', '/ops/fleet/trips', '/ops/documents', '/ops/notifications',
+  ],
+  Operator: [
+    '/ops/dashboard',
+    '/ops/shipments', '/ops/container-tracking', '/ops/sla-alerts',
+    '/ops/dispatch', '/ops/drivers', '/ops/fleet',
+    '/ops/live-map', '/ops/fleet/trips', '/ops/documents', '/ops/notifications',
+  ],
+  Agent: [
+    '/agent/dashboard',
+    '/agent/shipments', '/agent/orders',
+    '/agent/warehouse/inbound', '/agent/warehouse/outbound',
+    '/agent/warehouse/stock', '/agent/warehouse/locations', '/agent/warehouse/damage',
+    '/agent/trips', '/agent/pod', '/agent/map', '/agent/expenses',
+    '/agent/finance/invoices', '/agent/finance/payments', '/agent/finance/reconciliation',
+    '/agent/customers', '/agent/documents', '/agent/reports', '/agent/notifications',
+  ],
+  Staff: [
+    '/staff/dashboard',
+    '/staff/shipments', '/staff/orders',
+    '/staff/customers',
+    '/staff/warehouse', '/staff/warehouse/damage',
+    '/staff/documents',
+    '/staff/finance/invoices',
+    '/staff/reports', '/staff/notifications',
+  ],
+  CustomsAgent: [
+    '/customs/dashboard',
+    '/customs/declarations', '/customs/pending', '/customs/cleared', '/customs/holds',
+    '/customs/hs-codes', '/customs/licenses', '/customs/dg', '/customs/restrictions',
+    '/customs/documents', '/customs/documents/invoices', '/customs/documents/coo',
+    '/customs/reports', '/customs/notifications',
+  ],
+  PortAgent: [
+    '/port/dashboard',
+    '/port/vessels', '/port/flights', '/port/berths',
+    '/port/containers', '/port/manifests', '/port/cargo-log',
+    '/port/charges', '/port/documents', '/port/reports', '/port/notifications',
+  ],
+  CustomerPortal: [
+    '/portal/dashboard',
+    '/portal/shipments', '/portal/tracking',
+    '/portal/bookings/new', '/portal/bookings',
+    '/portal/documents',
+    '/portal/invoices', '/portal/payments',
+    '/portal/support/new', '/portal/support',
+    '/portal/notifications',
+  ],
+  AuditorReadOnly: [
+    '/audit/dashboard',
+    '/audit/shipments', '/audit/dispatches', '/audit/fleet', '/audit/warehouse',
+    '/audit/finance/invoices', '/audit/finance/payments', '/audit/finance/expenses',
+    '/audit/compliance/customs', '/audit/compliance/licenses',
+    '/audit/logs', '/audit/access-logs', '/audit/error-logs',
+    '/audit/reports',
+  ],
+};
+
 // ============================================
 // MOCK USERS (Updated with multi-tenancy)
 // ============================================
-export const mockUsers: User[] = [
+export const mockUsers: MockUser[] = [
   {
-    id: 'usr-001',
-    username: 'superadmin',
-    password: 'admin123',
-    name: 'Rajesh Kumar',
-    email: 'rajesh.kumar@logisticspro.com',
-    phone: '+91 98765 43210',
-    role: 'SuperAdmin',
-    status: 'Active',
-    lastLogin: '2025-01-15T09:30:00Z',
-    createdAt: '2024-01-01T00:00:00Z',
-    avatar: 'RK',
-    companyId: null,
-    organizationId: null,
-    agentId: null
+    id: 'usr-001', name: 'Rajesh Kumar', username: 'superadmin', password: 'admin123',
+    email: 'rajesh.kumar@logisticspro.com', phone: '+91 98765 43210',
+    role: 'SuperAdmin', status: 'Active',
+    companyId: null, organizationId: null, agentId: null,
+    avatar: 'RK', dashboardRoute: '/admin/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['SuperAdmin'],
+    lastLogin: '2025-01-15T09:30:00Z', createdAt: '2024-01-01T00:00:00Z',
   },
   {
-    id: 'usr-002',
-    username: 'ops_manager',
-    password: 'ops123',
-    name: 'Priya Sharma',
-    email: 'priya.sharma@techlogistics.com',
-    phone: '+91 98765 43211',
-    role: 'Manager',
-    status: 'Active',
-    lastLogin: '2025-01-15T08:45:00Z',
-    createdAt: '2024-02-15T00:00:00Z',
-    avatar: 'PS',
-    companyId: 'cmp-001',
-    organizationId: 'org-001',
-    agentId: 'agt-001'
+    id: 'usr-002', name: 'Priya Sharma', username: 'ops_manager', password: 'ops123',
+    email: 'priya.sharma@techlogistics.com', phone: '+91 98765 43211',
+    role: 'Manager', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-001', agentId: 'agt-001',
+    avatar: 'PS', dashboardRoute: '/manager/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Manager'],
+    lastLogin: '2025-01-15T08:45:00Z', createdAt: '2024-02-15T00:00:00Z',
   },
   {
-    id: 'usr-003',
-    username: 'dispatch',
-    password: 'dispatch123',
-    name: 'Amit Patel',
-    email: 'amit.patel@techlogistics.com',
-    phone: '+91 98765 43212',
-    role: 'Dispatcher',
-    status: 'Active',
-    lastLogin: '2025-01-15T07:00:00Z',
-    createdAt: '2024-03-10T00:00:00Z',
-    avatar: 'AP',
-    companyId: 'cmp-001',
-    organizationId: 'org-002',
-    agentId: null
+    id: 'usr-003', name: 'Amit Patel', username: 'dispatch', password: 'dispatch123',
+    email: 'amit.patel@techlogistics.com', phone: '+91 98765 43212',
+    role: 'Dispatcher', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-002', agentId: null,
+    avatar: 'AP', dashboardRoute: '/ops/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Dispatcher'],
+    lastLogin: '2025-01-15T07:00:00Z', createdAt: '2024-03-10T00:00:00Z',
   },
   {
-    id: 'usr-004',
-    username: 'warehouse',
-    password: 'warehouse123',
-    name: 'Sunita Reddy',
-    email: 'sunita.reddy@techlogistics.com',
-    phone: '+91 98765 43213',
-    role: 'Agent',
-    status: 'Active',
-    lastLogin: '2025-01-14T18:00:00Z',
-    createdAt: '2024-04-05T00:00:00Z',
-    avatar: 'SR',
-    companyId: 'cmp-001',
-    organizationId: 'org-001',
-    agentId: null
+    id: 'usr-004', name: 'Sunita Reddy', username: 'warehouse', password: 'warehouse123',
+    email: 'sunita.reddy@techlogistics.com', phone: '+91 98765 43213',
+    role: 'Agent', agentType: 'warehouse', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-001', agentId: null,
+    avatar: 'SR', dashboardRoute: '/agent/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Agent'],
+    lastLogin: '2025-01-14T18:00:00Z', createdAt: '2024-04-05T00:00:00Z',
   },
   {
-    id: 'usr-005',
-    username: 'driver01',
-    password: 'driver123',
-    name: 'Mohammed Khan',
-    email: 'mohammed.khan@techlogistics.com',
-    phone: '+91 98765 43214',
-    role: 'Agent',
-    status: 'Active',
-    lastLogin: '2025-01-15T06:00:00Z',
-    createdAt: '2024-05-20T00:00:00Z',
-    avatar: 'MK',
-    companyId: 'cmp-001',
-    organizationId: 'org-001',
-    agentId: null
+    id: 'usr-005', name: 'Mohammed Khan', username: 'driver01', password: 'driver123',
+    email: 'mohammed.khan@techlogistics.com', phone: '+91 98765 43214',
+    role: 'Agent', agentType: 'driver', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-001', agentId: null,
+    avatar: 'MK', dashboardRoute: '/agent/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Agent'],
+    lastLogin: '2025-01-15T06:00:00Z', createdAt: '2024-05-20T00:00:00Z',
   },
   {
-    id: 'usr-006',
-    username: 'finance',
-    password: 'finance123',
-    name: 'Ananya Gupta',
-    email: 'ananya.gupta@techlogistics.com',
-    phone: '+91 98765 43215',
-    role: 'Agent',
-    status: 'Active',
-    lastLogin: '2025-01-15T10:00:00Z',
-    createdAt: '2024-06-12T00:00:00Z',
-    avatar: 'AG',
-    companyId: 'cmp-001',
-    organizationId: 'org-001',
-    agentId: null
+    id: 'usr-006', name: 'Ananya Gupta', username: 'finance', password: 'finance123',
+    email: 'ananya.gupta@techlogistics.com', phone: '+91 98765 43215',
+    role: 'Agent', agentType: 'finance', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-001', agentId: null,
+    avatar: 'AG', dashboardRoute: '/agent/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Agent'],
+    lastLogin: '2025-01-15T10:00:00Z', createdAt: '2024-06-12T00:00:00Z',
   },
   {
-    id: 'usr-007',
-    username: 'support',
-    password: 'support123',
-    name: 'Vikram Singh',
-    email: 'vikram.singh@techlogistics.com',
-    phone: '+91 98765 43216',
-    role: 'Staff',
-    status: 'Active',
-    lastLogin: '2025-01-15T09:00:00Z',
-    createdAt: '2024-07-08T00:00:00Z',
-    avatar: 'VS',
-    companyId: 'cmp-001',
-    organizationId: 'org-002',
-    agentId: null
+    id: 'usr-007', name: 'Vikram Singh', username: 'support', password: 'support123',
+    email: 'vikram.singh@techlogistics.com', phone: '+91 98765 43216',
+    role: 'Staff', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-002', agentId: null,
+    avatar: 'VS', dashboardRoute: '/staff/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Staff'],
+    lastLogin: '2025-01-15T09:00:00Z', createdAt: '2024-07-08T00:00:00Z',
   },
   {
-    id: 'usr-008',
-    username: 'company_admin',
-    password: 'admin123',
-    name: 'Vikram Sharma',
-    email: 'admin@techlogistics.com',
-    phone: '+91 98765 43217',
-    role: 'CompanyAdmin',
-    status: 'Active',
-    lastLogin: '2025-01-14T14:30:00Z',
-    createdAt: '2024-08-01T00:00:00Z',
-    avatar: 'VS',
-    companyId: 'cmp-001',
-    organizationId: null,
-    agentId: null
+    id: 'usr-008', name: 'Vikram Sharma', username: 'company_admin', password: 'admin123',
+    email: 'admin@techlogistics.com', phone: '+91 98765 43217',
+    role: 'CompanyAdmin', status: 'Active',
+    companyId: 'cmp-001', organizationId: null, agentId: null,
+    avatar: 'VS', dashboardRoute: '/company/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['CompanyAdmin'],
+    lastLogin: '2025-01-14T14:30:00Z', createdAt: '2024-08-01T00:00:00Z',
   },
   {
-    id: 'usr-009',
-    username: 'operator01',
-    password: 'operator123',
-    name: 'Rajesh Verma',
-    email: 'rajesh.verma@techlogistics.com',
-    phone: '+91 98765 43218',
-    role: 'Operator',
-    status: 'Active',
-    lastLogin: '2025-01-15T11:00:00Z',
-    createdAt: '2024-09-15T00:00:00Z',
-    avatar: 'RV',
-    companyId: 'cmp-001',
-    organizationId: 'org-001',
-    agentId: null
+    id: 'usr-009', name: 'Rajesh Verma', username: 'operator01', password: 'operator123',
+    email: 'rajesh.verma@techlogistics.com', phone: '+91 98765 43218',
+    role: 'Operator', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-001', agentId: null,
+    avatar: 'RV', dashboardRoute: '/ops/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Operator'],
+    lastLogin: '2025-01-15T11:00:00Z', createdAt: '2024-09-15T00:00:00Z',
   },
   {
-    id: 'usr-010',
-    username: 'staff01',
-    password: 'staff123',
-    name: 'Neha Tripathi',
-    email: 'neha.tripathi@techlogistics.com',
-    phone: '+91 98765 43219',
-    role: 'Staff',
-    status: 'Active',
-    lastLogin: '2025-01-15T12:00:00Z',
-    createdAt: '2024-10-01T00:00:00Z',
-    avatar: 'NT',
-    companyId: 'cmp-001',
-    organizationId: 'org-001',
-    agentId: null
+    id: 'usr-010', name: 'Neha Tripathi', username: 'staff01', password: 'staff123',
+    email: 'neha.tripathi@techlogistics.com', phone: '+91 98765 43219',
+    role: 'Staff', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-001', agentId: null,
+    avatar: 'NT', dashboardRoute: '/staff/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Staff'],
+    lastLogin: '2025-01-15T12:00:00Z', createdAt: '2024-10-01T00:00:00Z',
+  },
+  {
+    id: 'usr-011', name: 'Arjun Mehta', username: 'customs01', password: 'customs123',
+    email: 'arjun.mehta@techlogistics.com', phone: '+91 98765 43220',
+    role: 'CustomsAgent', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-001', agentId: null,
+    avatar: 'AM', dashboardRoute: '/customs/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['CustomsAgent'],
+    lastLogin: '2025-01-15T08:00:00Z', createdAt: '2024-11-01T00:00:00Z',
+  },
+  {
+    id: 'usr-012', name: 'Deepa Nair', username: 'port01', password: 'port123',
+    email: 'deepa.nair@techlogistics.com', phone: '+91 98765 43221',
+    role: 'PortAgent', status: 'Active',
+    companyId: 'cmp-001', organizationId: 'org-002', agentId: null,
+    avatar: 'DN', dashboardRoute: '/port/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['PortAgent'],
+    lastLogin: '2025-01-15T07:30:00Z', createdAt: '2024-11-15T00:00:00Z',
+  },
+  {
+    id: 'usr-013', name: 'Suresh Pillai', username: 'customer01', password: 'cust123',
+    email: 'suresh.pillai@clientcorp.com', phone: '+91 98765 43222',
+    role: 'CustomerPortal', status: 'Active',
+    companyId: 'cmp-002', organizationId: null, agentId: null,
+    avatar: 'SP', dashboardRoute: '/portal/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['CustomerPortal'],
+    lastLogin: '2025-01-14T16:00:00Z', createdAt: '2024-12-01T00:00:00Z',
+  },
+  {
+    id: 'usr-014', name: 'Kavya Iyer', username: 'auditor01', password: 'audit123',
+    email: 'kavya.iyer@auditfirm.com', phone: '+91 98765 43223',
+    role: 'AuditorReadOnly', status: 'Active',
+    companyId: null, organizationId: null, agentId: null,
+    avatar: 'KI', dashboardRoute: '/audit/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['AuditorReadOnly'],
+    lastLogin: '2025-01-15T13:00:00Z', createdAt: '2024-12-15T00:00:00Z',
   }
 ];
 
@@ -1607,10 +1719,13 @@ export const roleMenuConfig: Record<UserRole, string[]> = {
   'CompanyAdmin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'agents', 'transport', 'finance', 'reports', 'notifications', 'settings'],
   'Manager': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'reports', 'notifications', 'settings'],
   'Dispatcher': ['dashboard', 'shipments', 'dispatch', 'drivers', 'fleet', 'notifications'],
+  'Operator': ['dashboard', 'shipments', 'dispatch', 'drivers', 'fleet', 'notifications'],
   'Agent': ['dashboard', 'shipments', 'orders', 'customers', 'finance', 'warehouse', 'reports', 'notifications'],
   'Staff': ['dashboard', 'shipments', 'orders', 'customers', 'finance', 'warehouse', 'reports', 'notifications'],
-  'Operator': ['dashboard', 'shipments', 'dispatch', 'drivers', 'fleet', 'notifications'],
-  'Admin': ['dashboard', 'shipments', 'orders', 'fleet', 'drivers', 'dispatch', 'warehouse', 'customers', 'finance', 'reports', 'notifications', 'users', 'settings'],
+  'CustomsAgent': ['dashboard', 'compliance', 'documents', 'reports', 'notifications'],
+  'PortAgent': ['dashboard', 'vessels', 'containers', 'documents', 'reports', 'notifications'],
+  'CustomerPortal': ['dashboard', 'shipments', 'tracking', 'bookings', 'documents', 'invoices', 'support', 'notifications'],
+  'AuditorReadOnly': ['dashboard', 'shipments', 'dispatch', 'fleet', 'warehouse', 'finance', 'compliance', 'logs', 'reports'],
 };
 
 // Role-based permissions
@@ -1705,17 +1820,34 @@ export const rolePermissions: Record<UserRole, Record<string, { view: boolean; c
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: false, create: false, edit: false, delete: false },
   },
-  'Admin': {
-    shipments: { view: true, create: true, edit: true, delete: true },
-    orders: { view: true, create: true, edit: true, delete: true },
-    fleet: { view: true, create: true, edit: true, delete: true },
-    drivers: { view: true, create: true, edit: true, delete: true },
-    dispatch: { view: true, create: true, edit: true, delete: true },
-    warehouse: { view: true, create: true, edit: true, delete: true },
-    customers: { view: true, create: true, edit: true, delete: true },
-    finance: { view: true, create: true, edit: true, delete: true },
-    reports: { view: true, create: true, edit: true, delete: true },
-    users: { view: true, create: true, edit: true, delete: true },
-    settings: { view: true, create: true, edit: true, delete: true },
+  'CustomsAgent': {
+    compliance: { view: true, create: true, edit: true, delete: false },
+    documents: { view: true, create: true, edit: true, delete: false },
+    reports: { view: true, create: false, edit: false, delete: false },
+    notifications: { view: true, create: false, edit: false, delete: false },
+  },
+  'PortAgent': {
+    shipments: { view: true, create: false, edit: true, delete: false },
+    documents: { view: true, create: true, edit: true, delete: false },
+    reports: { view: true, create: false, edit: false, delete: false },
+    notifications: { view: true, create: false, edit: false, delete: false },
+  },
+  'CustomerPortal': {
+    shipments: { view: true, create: false, edit: false, delete: false },
+    bookings: { view: true, create: true, edit: false, delete: false },
+    documents: { view: true, create: false, edit: false, delete: false },
+    finance: { view: true, create: false, edit: false, delete: false },
+    support: { view: true, create: true, edit: false, delete: false },
+    notifications: { view: true, create: false, edit: false, delete: false },
+  },
+  'AuditorReadOnly': {
+    shipments: { view: true, create: false, edit: false, delete: false },
+    dispatch: { view: true, create: false, edit: false, delete: false },
+    fleet: { view: true, create: false, edit: false, delete: false },
+    warehouse: { view: true, create: false, edit: false, delete: false },
+    finance: { view: true, create: false, edit: false, delete: false },
+    compliance: { view: true, create: false, edit: false, delete: false },
+    reports: { view: true, create: false, edit: false, delete: false },
+    logs: { view: true, create: false, edit: false, delete: false },
   },
 };

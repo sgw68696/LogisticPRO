@@ -6,7 +6,7 @@ import { KPICard } from '@/components/shared/KPICard';
 import { Button } from '@/components/ui/button';
 import {
   Truck, Waves, Plane, Package, TrendingUp,
-  MapPin, AlertTriangle, Clock, BarChart3,
+  MapPin,
 } from 'lucide-react';
 import { mockVehicles, mockAircraft, mockShips, mockCargo } from '@/data/mockData';
 
@@ -29,37 +29,37 @@ export default function FleetManagementPage() {
     ships.reduce((sum, s) => sum + s.cargoHoldCapacity, 0);
 
   return (
-    <PageWrapper title="Fleet Management" icon={Truck}>
+    <PageWrapper title="Fleet Management">
       <div className="space-y-6">
         {/* Overview KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard
             title="Total Assets"
             value={totalAssets}
-            trend={{ value: 3, direction: 'up' }}
-            icon={Truck}
-            status="Active"
+            trend={{ value: 3, isPositive: true }}
+            icon={<Truck className="w-5 h-5" />}
+            iconColor="amber"
           />
           <KPICard
             title="Active Units"
             value={activeAssets}
-            trend={{ value: 2, direction: 'up' }}
-            icon={TrendingUp}
-            status="Success"
+            trend={{ value: 2, isPositive: true }}
+            icon={<TrendingUp className="w-5 h-5" />}
+            iconColor="green"
           />
           <KPICard
             title="In Transit"
             value={inTransitCargo}
-            trend={{ value: 1, direction: 'up' }}
-            icon={MapPin}
-            status="Active"
+            trend={{ value: 1, isPositive: true }}
+            icon={<MapPin className="w-5 h-5" />}
+            iconColor="cyan"
           />
           <KPICard
             title="Total Capacity"
             value={`${(totalCapacity / 1000000).toFixed(1)}M`}
-            trend={{ value: 150, direction: 'up' }}
-            icon={Package}
-            status="Success"
+            trend={{ value: 150, isPositive: true }}
+            icon={<Package className="w-5 h-5" />}
+            iconColor="teal"
           />
         </div>
 

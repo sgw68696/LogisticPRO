@@ -3,7 +3,8 @@ import { UserRole } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import {
   Crown, Briefcase, Users, PackageCheck, Zap,
-  User, UserCog
+  User, UserCog, Ship, FileCheck2, ShieldCheck,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface RoleBadgeProps {
@@ -12,7 +13,7 @@ interface RoleBadgeProps {
   variant?: 'default' | 'outline' | 'subtle';
 }
 
-const roleConfig: Record<UserRole, { color: string; bgColor: string; icon: React.ComponentType<any>; label: string }> = {
+const roleConfig: Record<UserRole, { color: string; bgColor: string; icon: LucideIcon; label: string }> = {
   SuperAdmin: { color: 'text-purple-400', bgColor: 'bg-purple-500/10', icon: Crown, label: 'Super Admin' },
   CompanyAdmin: { color: 'text-blue-400', bgColor: 'bg-blue-500/10', icon: Briefcase, label: 'Company Admin' },
   Manager: { color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', icon: Users, label: 'Manager' },
@@ -20,7 +21,10 @@ const roleConfig: Record<UserRole, { color: string; bgColor: string; icon: React
   Agent: { color: 'text-sky-400', bgColor: 'bg-sky-500/10', icon: User, label: 'Agent' },
   Operator: { color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', icon: Zap, label: 'Operator' },
   Staff: { color: 'text-slate-400', bgColor: 'bg-slate-500/10', icon: UserCog, label: 'Staff' },
-  Admin: { color: 'text-red-400', bgColor: 'bg-red-500/10', icon: Crown, label: 'Admin' },
+  CustomsAgent: { color: 'text-indigo-400', bgColor: 'bg-indigo-500/10', icon: FileCheck2, label: 'Customs Agent' },
+  PortAgent: { color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', icon: Ship, label: 'Port Agent' },
+  CustomerPortal: { color: 'text-green-400', bgColor: 'bg-green-500/10', icon: User, label: 'Customer Portal' },
+  AuditorReadOnly: { color: 'text-zinc-400', bgColor: 'bg-zinc-500/10', icon: ShieldCheck, label: 'Auditor Read Only' },
 };
 
 export function RoleBadge({ role, size = 'md', variant = 'default' }: RoleBadgeProps) {

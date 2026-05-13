@@ -119,7 +119,7 @@ export function canViewResource(
  * Check if a role has admin-level access
  */
 export function isAdminRole(role: UserRole): boolean {
-  return role === 'SuperAdmin' || role === 'CompanyAdmin' || role === 'Admin';
+  return role === 'SuperAdmin' || role === 'CompanyAdmin';
 }
 
 /**
@@ -138,10 +138,13 @@ export function getRoleDisplayName(role: UserRole): string {
     'CompanyAdmin': 'Company Administrator',
     'Manager': 'Manager',
     'Dispatcher': 'Dispatcher',
+    'Operator': 'Operator',
     'Agent': 'Agent',
     'Staff': 'Staff',
-    'Operator': 'Operator',
-    'Admin': 'Administrator',
+    'CustomsAgent': 'Customs Agent',
+    'PortAgent': 'Port Agent',
+    'CustomerPortal': 'Customer Portal',
+    'AuditorReadOnly': 'Auditor Read Only',
   };
   
   return roleNames[role] || role;
@@ -156,10 +159,13 @@ export function getRoleDescription(role: UserRole): string {
     'CompanyAdmin': 'Full access to company data and agent management',
     'Manager': 'Can manage shipments, fleet, and teams',
     'Dispatcher': 'Can manage dispatch and vehicle routing',
+    'Operator': 'Can manage dispatch operations',
     'Agent': 'Can create and manage shipments and orders',
     'Staff': 'Can view and manage basic operational data',
-    'Operator': 'Can manage dispatch operations',
-    'Admin': 'Full access to system features',
+    'CustomsAgent': 'Can manage customs declarations and compliance documents',
+    'PortAgent': 'Can manage port, vessel, manifest, and cargo records',
+    'CustomerPortal': 'Can view own shipments, bookings, invoices, and support tickets',
+    'AuditorReadOnly': 'Can review operational, finance, compliance, and audit records',
   };
   
   return descriptions[role] || '';
@@ -170,14 +176,17 @@ export function getRoleDescription(role: UserRole): string {
  */
 export function getAvailableRolesForAgentCreation(creatorRole: UserRole): UserRole[] {
   const availableRoles: Record<UserRole, UserRole[]> = {
-    'SuperAdmin': ['CompanyAdmin', 'Manager', 'Dispatcher', 'Agent', 'Staff', 'Operator'],
-    'CompanyAdmin': ['Manager', 'Dispatcher', 'Agent', 'Staff', 'Operator'],
+    'SuperAdmin': ['CompanyAdmin', 'Manager', 'Dispatcher', 'Operator', 'Agent', 'Staff', 'CustomsAgent', 'PortAgent', 'CustomerPortal', 'AuditorReadOnly'],
+    'CompanyAdmin': ['Manager', 'Dispatcher', 'Operator', 'Agent', 'Staff', 'CustomsAgent', 'PortAgent', 'CustomerPortal', 'AuditorReadOnly'],
     'Manager': ['Agent', 'Staff'],
     'Dispatcher': [],
+    'Operator': [],
     'Agent': [],
     'Staff': [],
-    'Operator': [],
-    'Admin': ['Manager', 'Dispatcher', 'Agent', 'Staff'],
+    'CustomsAgent': [],
+    'PortAgent': [],
+    'CustomerPortal': [],
+    'AuditorReadOnly': [],
   };
   
   return availableRoles[creatorRole] || [];
@@ -192,10 +201,13 @@ export function getRoleColor(role: UserRole): string {
     'CompanyAdmin': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
     'Manager': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
     'Dispatcher': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    'Operator': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
     'Agent': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     'Staff': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-    'Operator': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-    'Admin': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    'CustomsAgent': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
+    'PortAgent': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
+    'CustomerPortal': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+    'AuditorReadOnly': 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
   };
   
   return colors[role] || colors['Staff'];

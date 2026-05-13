@@ -3,22 +3,27 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Truck, AlertCircle, Eye, EyeOff, Package, MapPin, BarChart3, Zap } from 'lucide-react';
+import { Truck, AlertCircle, Eye, EyeOff, Package, MapPin, BarChart3, Zap, ChevronDown } from 'lucide-react';
 import MagneticButton from '@/components/layout/MagneticButton';
 import Image from 'next/image';
-import AnimatedLogo from '../Animatedlogo';
-const demoCredentials = [
-  { role: 'Super Admin', username: 'superadmin', password: 'admin123' },
-  { role: 'Company Admin', username: 'company_admin', password: 'admin123' },
-  { role: 'Manager', username: 'ops_manager', password: 'ops123' },
-  { role: 'Dispatcher', username: 'dispatch', password: 'dispatch123' },
-  { role: 'Agent (Warehouse)', username: 'warehouse', password: 'warehouse123' },
-  { role: 'Agent (Driver)', username: 'driver01', password: 'driver123' },
-  { role: 'Agent (Finance)', username: 'finance', password: 'finance123' },
-  { role: 'Staff', username: 'support', password: 'support123' },
-  { role: 'Operator', username: 'operator01', password: 'operator123' },
-  { role: 'Staff (Additional)', username: 'staff01', password: 'staff123' },
-];
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { mockUsers, type UserRole } from '@/data/mockData';
+
+const roleBadgeVariants: Record<UserRole, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  SuperAdmin: 'destructive',
+  CompanyAdmin: 'default',
+  Manager: 'default',
+  Dispatcher: 'default',
+  Operator: 'default',
+  Agent: 'default',
+  Staff: 'default',
+  CustomsAgent: 'default',
+  PortAgent: 'default',
+  CustomerPortal: 'default',
+  AuditorReadOnly: 'default',
+};
 
 const stats = [
   { icon: Package, value: '3,600+', label: 'Shipments' },
@@ -35,6 +40,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isQuickLoginOpen, setIsQuickLoginOpen] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
 
@@ -189,15 +195,12 @@ export default function LoginPage() {
     e.currentTarget.style.setProperty('--gy', `${e.clientY - rect.top}px`);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitLogin = async (nextUsername: string, nextPassword: string) => {
     setError('');
     setIsLoading(true);
     try {
-      const response = await login(username, password);
-      if (response.success) {
-        router.push('/dashboard');
-      } else {
+      const response = await login(nextUsername, nextPassword, router);
+      if (!response.success) {
         setError(response.error || 'Invalid credentials');
       }
     } catch {
@@ -205,6 +208,17 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitLogin(username, password);
+  };
+
+  const handleQuickLogin = async (nextUsername: string, nextPassword: string) => {
+    setUsername(nextUsername);
+    setPassword(nextPassword);
+    await submitLogin(nextUsername, nextPassword);
   };
 
   return (
@@ -377,29 +391,59 @@ export default function LoginPage() {
               </MagneticButton>
             </form>
 
-            <div className="divider">
-              <div className="divider-line" />
-              <span className="divider-text">Demo Accounts</span>
-              <div className="divider-line" />
-            </div>
-
-            <div className="demo-grid">
-              {demoCredentials.map((cred) => (
-                <MagneticButton
-                  key={cred.username}
-                  className="demo-btn spotlight-btn"
-                  onClick={() => {
-                    setUsername(cred.username);
-                    setPassword(cred.password);
-                  }}
-                  onMouseMove={handleBtnMouseMove}
-                  strength={0.35}
-                  radius={85}
+            <Collapsible
+              open={isQuickLoginOpen}
+              onOpenChange={setIsQuickLoginOpen}
+              className="mt-6 rounded-lg border border-white/10 bg-white/[0.04]"
+            >
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-300"
                 >
-                  {cred.role}
-                </MagneticButton>
-              ))}
-            </div>
+                  <span>Quick Login (Dev Only)</span>
+                  <ChevronDown
+                    size={15}
+                    className={`transition-transform ${isQuickLoginOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t border-white/10 p-2">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow className="border-white/10 hover:bg-transparent">
+                      <TableHead className="h-8 px-2 text-slate-400">Name</TableHead>
+                      <TableHead className="h-8 px-2 text-slate-400">Role</TableHead>
+                      <TableHead className="h-8 px-2 text-slate-400">Username</TableHead>
+                      <TableHead className="h-8 px-2 text-slate-400">Password</TableHead>
+                      <TableHead className="h-8 px-2 text-right text-slate-400">Login</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mockUsers.map((user) => (
+                      <TableRow key={user.id} className="border-white/10 hover:bg-white/[0.04]">
+                        <TableCell className="px-2 py-1.5 text-slate-200">{user.name}</TableCell>
+                        <TableCell className="px-2 py-1.5">
+                          <Badge variant={roleBadgeVariants[user.role]}>{user.role}</Badge>
+                        </TableCell>
+                        <TableCell className="px-2 py-1.5 font-mono text-slate-300">{user.username}</TableCell>
+                        <TableCell className="px-2 py-1.5 font-mono text-slate-300">{user.password}</TableCell>
+                        <TableCell className="px-2 py-1.5 text-right">
+                          <button
+                            type="button"
+                            className="rounded-md border border-white/10 px-2 py-1 text-xs font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={isLoading}
+                            onClick={() => void handleQuickLogin(user.username, user.password)}
+                          >
+                            Login
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         </div>
       </div>

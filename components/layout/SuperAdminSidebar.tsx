@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { superAdminMenu, type MenuItem } from '@/data/super-admin-menu';
@@ -16,7 +16,13 @@ export function SuperAdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
   const pathname = usePathname();
+  const router = useRouter();
   const { logout, user } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
 
   const toggleMenu = (menuId: string) => {
     const newExpanded = new Set(expandedMenus);
@@ -42,7 +48,8 @@ export function SuperAdminSidebar() {
     return items.map((item) => {
       const isActive = isMenuActive(item);
       const isExpanded = expandedMenus.has(item.id);
-      const hasChildren = item.children && item.children.length > 0;
+      const children = item.children ?? [];
+      const hasChildren = children.length > 0;
       const Icon = item.icon;
 
       return (
@@ -105,7 +112,7 @@ export function SuperAdminSidebar() {
 
           {hasChildren && isExpanded && !collapsed && (
             <div className="ml-2 mt-1 border-l border-[rgba(14,165,233,0.1)] pl-2">
-              {renderMenuItems(item.children, level + 1)}
+              {renderMenuItems(children, level + 1)}
             </div>
           )}
         </div>
@@ -220,7 +227,7 @@ export function SuperAdminSidebar() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className={cn(
                   "group w-full flex items-center gap-2.5 rounded-[10px]",
                   "bg-[rgba(255,255,255,0.04)] border border-[rgba(14,165,233,0.1)]",

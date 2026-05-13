@@ -15,6 +15,11 @@ import {
   Eye,
   FileText,
   AlertCircle,
+  Calendar,
+  Calculator,
+  FileCheck,
+  Scale,
+  ClipboardCheck,
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -263,6 +268,68 @@ export const superAdminMenu: MenuItem[] = [
         icon: FileText,
         href: '/admin/finance/taxes',
         description: 'Tax management',
+      },
+    ],
+  },
+
+  // Bookings & Rates
+  {
+    id: 'bookings-rates',
+    label: 'Bookings & Rates',
+    icon: Calendar,
+    description: 'Manage bookings and pricing',
+    children: [
+      {
+        id: 'all-bookings',
+        label: 'All Bookings',
+        icon: Calendar,
+        href: '/admin/bookings',
+        description: 'View all bookings across companies',
+      },
+      {
+        id: 'rate-cards',
+        label: 'Rate Cards',
+        icon: Calculator,
+        href: '/admin/rates/cards',
+        description: 'Manage global rate cards',
+      },
+      {
+        id: 'contract-rates',
+        label: 'Contract Rates',
+        icon: FileCheck,
+        href: '/admin/rates/contracts',
+        description: 'Manage carrier contracts',
+      },
+    ],
+  },
+
+  // Compliance & Customs
+  {
+    id: 'compliance-customs',
+    label: 'Compliance & Customs',
+    icon: Scale,
+    description: 'Regulatory compliance management',
+    children: [
+      {
+        id: 'customs-declarations',
+        label: 'Customs Declarations',
+        icon: FileText,
+        href: '/admin/compliance/customs',
+        description: 'Monitor all customs declarations',
+      },
+      {
+        id: 'import-export-licenses',
+        label: 'Import/Export Licenses',
+        icon: FileCheck,
+        href: '/admin/compliance/licenses',
+        description: 'Manage licenses and permits',
+      },
+      {
+        id: 'compliance-reports',
+        label: 'Compliance Reports',
+        icon: ClipboardCheck,
+        href: '/admin/compliance/reports',
+        description: 'Regulatory compliance reports',
       },
     ],
   },

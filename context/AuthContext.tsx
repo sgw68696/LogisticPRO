@@ -3,21 +3,28 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as loginService, logout as logoutService, type AuthResponse } from '@/services/authService';
 import { roleMenuConfig, rolePermissions, type User, type UserRole, type PermissionAction } from '@/data/mockData';
+import { ROLE_DASHBOARD_MAP } from '@/services/authService';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<AuthResponse>;
+  login: (username: string, password: string, router?: NavigationRouter) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   hasPermission: (module: string, action: PermissionAction) => boolean;
   allowedMenuItems: string[];
   isSuperAdmin: boolean;
   isCompanyAdmin: boolean;
+  isStaff: boolean;
   canManageUsers: boolean;
   canManageAgents: boolean;
+  getDashboardRoute: () => string;
   getCurrentCompanyId: () => string | null;
   getCurrentOrganizationId: () => string | null;
+}
+
+interface NavigationRouter {
+  push: (href: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for existing session
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem('user') ?? localStorage.getItem('loggedInUser');
     const token = localStorage.getItem('token');
     
     if (storedUser && token) {
@@ -37,10 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (username: string, password: string): Promise<AuthResponse> => {
+  const login = useCallback(async (username: string, password: string, router?: NavigationRouter): Promise<AuthResponse> => {
     setIsLoading(true);
     try {
-      const response = await loginService({ username, password });
+      const response = await loginService({ username, password }, router);
       
       if (response.success && response.user && response.token) {
         localStorage.setItem('user', JSON.stringify(response.user));
@@ -58,10 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       await logoutService();
+    } finally {
       localStorage.removeItem('user');
+      localStorage.removeItem('loggedInUser');
       localStorage.removeItem('token');
       setUser(null);
-    } finally {
       setIsLoading(false);
     }
   }, []);
@@ -76,11 +84,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const isSuperAdmin = user?.role === 'SuperAdmin';
   const isCompanyAdmin = user?.role === 'CompanyAdmin';
+  const isStaff = user?.role === 'Staff';
   const canManageUsers = isSuperAdmin || isCompanyAdmin;
   const canManageAgents = isCompanyAdmin || user?.role === 'Manager';
   
   const getCurrentCompanyId = useCallback(() => user?.companyId || null, [user]);
   const getCurrentOrganizationId = useCallback(() => user?.organizationId || null, [user]);
+  const getDashboardRoute = useCallback(() => {
+    if (!user) return '/login';
+    return ROLE_DASHBOARD_MAP[user.role as UserRole] || '/dashboard';
+  }, [user]);
 
   return (
     <AuthContext.Provider
@@ -94,8 +107,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         allowedMenuItems,
         isSuperAdmin,
         isCompanyAdmin,
+        isStaff,
         canManageUsers,
         canManageAgents,
+        getDashboardRoute,
         getCurrentCompanyId,
         getCurrentOrganizationId,
       }}
