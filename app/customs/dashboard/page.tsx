@@ -51,30 +51,26 @@ export default function CustomsDashboard() {
           <KPICard
             title="Declarations Pending"
             value="12"
-            icon={FileText}
-            bgColor="bg-blue-50"
-            iconColor="text-blue-600"
+            icon={<FileText className="w-5 h-5" />}
+            iconColor="cyan"
           />
           <KPICard
             title="Cleared Today"
             value="8"
-            icon={CheckCircle}
-            bgColor="bg-green-50"
-            iconColor="text-green-600"
+            icon={<CheckCircle className="w-5 h-5" />}
+            iconColor="green"
           />
           <KPICard
             title="Holds / Queries"
             value="4"
-            icon={AlertCircle}
-            bgColor="bg-red-50"
-            iconColor="text-red-600"
+            icon={<AlertCircle className="w-5 h-5" />}
+            iconColor="red"
           />
           <KPICard
             title="HS Code Lookups"
             value="156"
-            icon={Search}
-            bgColor="bg-purple-50"
-            iconColor="text-purple-600"
+            icon={<Search className="w-5 h-5" />}
+            iconColor="indigo"
           />
         </div>
 

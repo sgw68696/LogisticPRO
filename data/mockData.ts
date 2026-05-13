@@ -409,6 +409,8 @@ export interface AgentPermission {
 }
 
 export interface Shipment {
+  customerName: any;
+  customer: any;
   id: string;
   trackingNumber: string;
   senderName: string;

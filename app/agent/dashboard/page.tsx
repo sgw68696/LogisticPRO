@@ -98,10 +98,10 @@ export default function AgentDashboard() {
       return {
         title: 'Warehouse Dashboard',
         kpis: [
-          { label: 'GRNs Today', value: grnCount, icon: Package, trend: '+2' },
-          { label: 'Pending Outbound', value: outboundCount, icon: TrendingUp, trend: '+1' },
-          { label: 'Stock Alerts', value: alertCount, icon: AlertCircle, trend: 'Active' },
-          { label: 'Damage Reports', value: damageCount, icon: AlertTriangle, trend: '-1' },
+          { title: 'GRNs Today', value: grnCount, icon: <Package className="w-5 h-5" />, trend: { value: 2, isPositive: true }, description: undefined },
+          { title: 'Pending Outbound', value: outboundCount, icon: <TrendingUp className="w-5 h-5" />, trend: { value: 1, isPositive: true }, description: undefined },
+          { title: 'Stock Alerts', value: alertCount, icon: <AlertCircle className="w-5 h-5" />, description: 'Active' },
+          { title: 'Damage Reports', value: damageCount, icon: <AlertTriangle className="w-5 h-5" />, trend: { value: 1, isPositive: false }, description: undefined },
         ],
         taskTable,
       };
@@ -157,10 +157,10 @@ export default function AgentDashboard() {
       return {
         title: 'Driver Dashboard',
         kpis: [
-          { label: "Today's Trips", value: todayTrips, icon: Truck, trend: '+1' },
-          { label: 'KM Driven', value: `${kmDriven} km`, icon: MapPin, trend: 'Active' },
-          { label: 'Deliveries Completed', value: deliveries, icon: CheckCircle, trend: '+5' },
-          { label: 'Pending PODs', value: pendingPods, icon: FileCheck, trend: '-1' },
+          { title: "Today's Trips", value: todayTrips, icon: <Truck className="w-5 h-5" />, trend: { value: 1, isPositive: true }, description: undefined },
+          { title: 'KM Driven', value: `${kmDriven} km`, icon: <MapPin className="w-5 h-5" />, description: 'Active' },
+          { title: 'Deliveries Completed', value: deliveries, icon: <CheckCircle className="w-5 h-5" />, trend: { value: 5, isPositive: true }, description: undefined },
+          { title: 'Pending PODs', value: pendingPods, icon: <FileCheck className="w-5 h-5" />, trend: { value: 1, isPositive: false }, description: undefined },
         ],
         taskTable,
       };
@@ -215,10 +215,10 @@ export default function AgentDashboard() {
     return {
       title: 'Finance Dashboard',
       kpis: [
-        { label: 'Invoices Due', value: invoicesDue, icon: FileText, trend: '+1' },
-        { label: 'Payments Received', value: paymentsToday, icon: CreditCard, trend: '+2' },
-        { label: 'Overdue Count', value: overdue, icon: AlertCircle, trend: '-1' },
-        { label: 'Reconciled %', value: `${reconciledPct}%`, icon: RefreshCcw, trend: '+2%' },
+        { title: 'Invoices Due', value: invoicesDue, icon: <FileText className="w-5 h-5" />, trend: { value: 1, isPositive: true }, description: undefined },
+        { title: 'Payments Received', value: paymentsToday, icon: <CreditCard className="w-5 h-5" />, trend: { value: 2, isPositive: true }, description: undefined },
+        { title: 'Overdue Count', value: overdue, icon: <AlertCircle className="w-5 h-5" />, trend: { value: 1, isPositive: false }, description: undefined },
+        { title: 'Reconciled %', value: `${reconciledPct}%`, icon: <RefreshCcw className="w-5 h-5" />, trend: { value: 2, isPositive: true }, description: undefined },
       ],
       taskTable,
     };
@@ -229,11 +229,12 @@ export default function AgentDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {dashboardContent.kpis.map((kpi) => (
           <KPICard
-            key={kpi.label}
-            label={kpi.label}
+            key={kpi.title}
+            title={kpi.title}
             value={String(kpi.value)}
             icon={kpi.icon}
             trend={kpi.trend}
+            description={kpi.description}
           />
         ))}
       </div>

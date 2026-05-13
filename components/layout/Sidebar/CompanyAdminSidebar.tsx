@@ -182,9 +182,7 @@ const companyAdminMenu: CompanyMenuItem[] = [
 
 export function CompanyAdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(
-    new Set(companyAdminMenu.filter(item => item.children).map(item => item.id))
-  );
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
   const pathname = usePathname();
   const router = useRouter();
   const { logout, user } = useAuth();

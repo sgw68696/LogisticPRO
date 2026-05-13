@@ -17,15 +17,15 @@ import { Badge } from '@/components/ui/badge';
 
 const getStatusColor = (status: string) => {
   const statusColorMap: Record<string, string> = {
-    'Arrived': 'bg-green-500/10 text-green-700 border-green-200',
-    'Berthing': 'bg-blue-500/10 text-blue-700 border-blue-200',
-    'In Port': 'bg-cyan-500/10 text-cyan-700 border-cyan-200',
-    'Departed': 'bg-gray-500/10 text-gray-700 border-gray-200',
-    'Unloading': 'bg-purple-500/10 text-purple-700 border-purple-200',
-    'Loaded': 'bg-green-500/10 text-green-700 border-green-200',
-    'Pending': 'bg-yellow-500/10 text-yellow-700 border-yellow-200',
+    'Arrived': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    'Berthing': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    'In Port': 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+    'Departed': 'bg-muted/50 text-muted-foreground border-border/40',
+    'Unloading': 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+    'Loaded': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    'Pending': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   };
-  return statusColorMap[status] || 'bg-gray-500/10 text-gray-700 border-gray-200';
+  return statusColorMap[status] || 'bg-muted/50 text-muted-foreground border-border/40';
 };
 
 // Static mock data for vessel schedule
@@ -53,62 +53,58 @@ export default function PortDashboard() {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard
-            title="Vessels Arriving Today"
+            label="Vessels Arriving Today"
             value="2"
-            icon={Ship}
-            bgColor="bg-blue-50"
-            iconColor="text-blue-600"
+            icon={<Ship className="w-4 h-4" />}
+            trend="Active"
           />
           <KPICard
-            title="Cargo Pending Offload"
+            label="Cargo Pending Offload"
             value="342"
-            icon={Package}
-            bgColor="bg-orange-50"
-            iconColor="text-orange-600"
+            icon={<Package className="w-4 h-4" />}
+            trend="+18"
           />
           <KPICard
-            title="Containers In Port"
+            label="Containers In Port"
             value="1,248"
-            icon={Package}
-            bgColor="bg-purple-50"
-            iconColor="text-purple-600"
+            icon={<Package className="w-4 h-4" />}
+            trend="+42"
           />
           <KPICard
-            title="Berths Occupied"
+            label="Berths Occupied"
             value="4 / 6"
-            icon={Anchor}
-            bgColor="bg-green-50"
-            iconColor="text-green-600"
+            icon={<Anchor className="w-4 h-4" />}
+            trend="66%"
           />
         </div>
 
         {/* Tables Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Vessel Schedule Table */}
-          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900">Vessel Schedule</h3>
+          <div className="bg-card border border-border/60 rounded-xl overflow-hidden shadow-soft">
+            <div className="p-4 border-b border-border/40">
+              <h3 className="text-[0.88rem] font-semibold text-foreground">Vessel Schedule</h3>
             </div>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs font-semibold text-slate-700">Vessel Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700">IMO No.</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700">ETA</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700">Berth</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700">Status</TableHead>
+                <TableHeader className="bg-muted/20">
+                  <TableRow className="border-b border-border/40 hover:bg-transparent">
+                    <TableHead className="text-[0.70rem] font-bold text-muted-foreground uppercase tracking-widest">Vessel Name</TableHead>
+                    <TableHead className="text-[0.70rem] font-bold text-muted-foreground uppercase tracking-widest">IMO No.</TableHead>
+                    <TableHead className="text-[0.70rem] font-bold text-muted-foreground uppercase tracking-widest">ETA</TableHead>
+                    <TableHead className="text-[0.70rem] font-bold text-muted-foreground uppercase tracking-widest">Berth</TableHead>
+                    <TableHead className="text-[0.70rem] font-bold text-muted-foreground uppercase tracking-widest">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {vesselScheduleData.map((row) => (
-                    <TableRow key={row.vesselName} className="hover:bg-slate-50">
-                      <TableCell className="text-sm font-medium text-slate-900">{row.vesselName}</TableCell>
-                      <TableCell className="text-sm text-slate-600">{row.imo}</TableCell>
-                      <TableCell className="text-sm text-slate-600">{row.eta}</TableCell>
-                      <TableCell className="text-sm text-slate-600">{row.berthNo}</TableCell>
+                    <TableRow key={row.vesselName} className="border-b border-border/25 hover:bg-primary/[0.03]">
+                      <TableCell className="text-[0.82rem] font-semibold text-foreground">{row.vesselName}</TableCell>
+                      <TableCell className="text-[0.82rem] text-muted-foreground font-mono">{row.imo}</TableCell>
+                      <TableCell className="text-[0.82rem] text-muted-foreground">{row.eta}</TableCell>
+                      <TableCell className="text-[0.82rem] text-muted-foreground">{row.berthNo}</TableCell>
                       <TableCell>
-                        <Badge className={`text-xs ${getStatusColor(row.status)}`} variant="outline">
+                        <Badge variant="outline" className={`text-[0.72rem] font-bold ${getStatusColor(row.status)}`}>
                           {row.status}
                         </Badge>
                       </TableCell>
@@ -120,20 +116,20 @@ export default function PortDashboard() {
           </div>
 
           {/* Container Status List */}
-          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900">Container Status</h3>
+          <div className="bg-card border border-border/60 rounded-xl overflow-hidden shadow-soft">
+            <div className="p-4 border-b border-border/40">
+              <h3 className="text-[0.88rem] font-semibold text-foreground">Container Status</h3>
             </div>
-            <div className="divide-y divide-slate-200">
+            <div className="divide-y divide-border/25">
               {containerStatusData.map((row) => (
-                <div key={row.containerNo} className="p-4 hover:bg-slate-50 transition-colors">
+                <div key={row.containerNo} className="p-4 hover:bg-primary/[0.03] transition-colors duration-150">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{row.containerNo}</p>
-                      <p className="text-xs text-slate-600 mt-1">{row.type}</p>
-                      <p className="text-xs text-slate-500 mt-1">Location: {row.yardLocation}</p>
+                      <p className="text-[0.82rem] font-semibold text-foreground">{row.containerNo}</p>
+                      <p className="text-[0.78rem] text-muted-foreground mt-1">{row.type}</p>
+                      <p className="text-[0.72rem] text-muted-foreground/60 mt-1">Location: {row.yardLocation}</p>
                     </div>
-                    <Badge className={`ml-2 text-xs flex-shrink-0 ${getStatusColor(row.status)}`} variant="outline">
+                    <Badge variant="outline" className={`ml-2 text-[0.72rem] font-bold flex-shrink-0 ${getStatusColor(row.status)}`}>
                       {row.status}
                     </Badge>
                   </div>
