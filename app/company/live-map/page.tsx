@@ -1,5 +1,7 @@
-import { CompanyDataPage } from '@/components/company/CompanyAdminPages';
+'use client';
 
-export default function LiveMapPage() {
-  return <CompanyDataPage pageKey="liveMap" title="Live Map" />;
+import { LiveMapPage } from '@/components/company/LiveMapPage';
+
+export default function Page() {
+  return <LiveMapPage />;
 }
