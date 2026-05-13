@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { ManagerSidebar } from '@/components/layout/ManagerSidebar';
+import { ManagerSidebar } from '@/components/layout/Sidebar/ManagerSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
 

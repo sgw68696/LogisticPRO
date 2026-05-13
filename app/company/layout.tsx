@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { CompanyAdminSidebar } from '@/components/layout/CompanyAdminSidebar';
+import { CompanyAdminSidebar } from '@/components/layout/Sidebar/CompanyAdminSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
 import { getCompanyRouteRedirect } from '@/services/authService';
