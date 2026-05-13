@@ -9,7 +9,8 @@ import { toast } from 'sonner';
 // All roles and modules from your mockData types
 const ROLES: UserRole[] = [
   'SuperAdmin', 'CompanyAdmin', 'Manager',
-  'Dispatcher', 'Agent', 'Staff', 'Operator', 'Admin',
+  'Dispatcher', 'Operator', 'Agent', 'Staff',
+  'CustomsAgent', 'PortAgent', 'CustomerPortal', 'AuditorReadOnly',
 ];
 
 const MODULES = [
@@ -46,9 +47,9 @@ const buildDefaultMatrix = () => {
     matrix[role] = {};
     for (const mod of MODULES) {
       matrix[role][mod.key] = {
-        view:   role === 'SuperAdmin' || ['CompanyAdmin', 'Admin', 'Manager'].includes(role),
-        create: role === 'SuperAdmin' || ['CompanyAdmin', 'Admin'].includes(role),
-        edit:   role === 'SuperAdmin' || ['CompanyAdmin', 'Admin', 'Manager'].includes(role),
+        view:   role === 'SuperAdmin' || ['CompanyAdmin', 'Manager'].includes(role),
+        create: role === 'SuperAdmin' || role === 'CompanyAdmin',
+        edit:   role === 'SuperAdmin' || ['CompanyAdmin', 'Manager'].includes(role),
         delete: role === 'SuperAdmin' || role === 'CompanyAdmin',
       };
     }
@@ -73,7 +74,10 @@ const ROLE_STYLES: Record<UserRole, string> = {
   Agent:        'bg-teal-500/10  text-teal-400     border-teal-500/20',
   Staff:        'bg-muted/50     text-muted-foreground border-border/40',
   Operator:     'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  Admin:        'bg-rose-500/10  text-rose-400     border-rose-500/20',
+  CustomsAgent: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  PortAgent:    'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  CustomerPortal: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  AuditorReadOnly: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
 };
 
 const GROUP_COLORS: Record<string, string> = {

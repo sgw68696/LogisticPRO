@@ -20,15 +20,19 @@ const ROLE_STYLES: Record<UserRole, string> = {
   CompanyAdmin: 'bg-primary/10   text-primary     border border-primary/20',
   Manager:      'bg-sky-500/10   text-sky-400      border border-sky-500/20',
   Dispatcher:   'bg-amber-500/10 text-amber-400   border border-amber-500/20',
+  Operator:     'bg-orange-500/10 text-orange-400 border border-orange-500/20',
   Agent:        'bg-teal-500/10  text-teal-400     border border-teal-500/20',
   Staff:        'bg-muted/50     text-muted-foreground border border-border/40',
-  Operator:     'bg-orange-500/10 text-orange-400 border border-orange-500/20',
-  Admin:        'bg-rose-500/10  text-rose-400     border border-rose-500/20',
+  CustomsAgent: 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20',
+  PortAgent:    'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20',
+  CustomerPortal: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+  AuditorReadOnly: 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
 };
 
 const ROLE_OPTIONS: UserRole[] = [
   'SuperAdmin', 'CompanyAdmin', 'Manager',
-  'Dispatcher', 'Agent', 'Staff', 'Operator', 'Admin',
+  'Dispatcher', 'Operator', 'Agent', 'Staff',
+  'CustomsAgent', 'PortAgent', 'CustomerPortal', 'AuditorReadOnly',
 ];
 
 export default function UsersPage() {

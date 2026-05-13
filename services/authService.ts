@@ -1,16 +1,11 @@
 import { APP_CONFIG } from "@/config/appConfig";
-import { mockUsers, type User } from "@/data/mockData";
+import { ROLE_DASHBOARD_MAP, mockUsers, type User } from "@/data/mockData";
 
-export const ROLE_DASHBOARD_MAP = {
-  SuperAdmin:   '/admin/dashboard',
-  CompanyAdmin: '/company/dashboard',
-  Manager:      '/manager/dashboard',
-  Dispatcher:   '/ops/dashboard',
-  Operator:     '/ops/dashboard',
-  Agent:        '/agent/dashboard',
-  Staff:        '/staff/dashboard',
-  Admin:        '/admin/dashboard',
-};
+export { ROLE_DASHBOARD_MAP };
+
+interface NavigationRouter {
+  push: (href: string) => void;
+}
 
 export interface LoginCredentials {
   username: string;
@@ -24,7 +19,7 @@ export interface AuthResponse {
   error?: string;
 }
 
-export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
+export const login = async (credentials: LoginCredentials, router?: NavigationRouter): Promise<AuthResponse> => {
   if (APP_CONFIG.USE_MOCK) {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -35,6 +30,22 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
     
     if (user) {
       const token = `mock-jwt-token-${user.id}-${Date.now()}`;
+      const storedUser = {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        agentType: user.agentType ?? null,
+        avatar: user.avatar,
+        companyId: user.companyId,
+        organizationId: user.organizationId,
+        dashboardRoute: user.dashboardRoute,
+      };
+
+      localStorage.setItem('loggedInUser', JSON.stringify(storedUser));
+      router?.push(user.dashboardRoute);
+
       return {
         success: true,
         user: { ...user, password: '' },
@@ -71,7 +82,7 @@ export const logout = async (): Promise<void> => {
 
 export const getCurrentUser = async (): Promise<User | null> => {
   if (APP_CONFIG.USE_MOCK) {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem('user') ?? localStorage.getItem('loggedInUser');
     if (storedUser) {
       return JSON.parse(storedUser);
     }

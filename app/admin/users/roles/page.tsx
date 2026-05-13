@@ -13,7 +13,8 @@ import Link from 'next/link';
 
 const ROLES: UserRole[] = [
   'SuperAdmin', 'CompanyAdmin', 'Manager',
-  'Dispatcher', 'Agent', 'Staff', 'Operator', 'Admin',
+  'Dispatcher', 'Operator', 'Agent', 'Staff',
+  'CustomsAgent', 'PortAgent', 'CustomerPortal', 'AuditorReadOnly',
 ];
 
 const MODULES = [
@@ -29,9 +30,9 @@ const ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
 const buildDefaultPermissions = (role: UserRole): Record<string, Record<PermissionAction, boolean>> => {
   const base = MODULES.reduce<Record<string, Record<PermissionAction, boolean>>>((acc, mod) => {
     acc[mod] = {
-      view:   role === 'SuperAdmin' || ['CompanyAdmin', 'Admin', 'Manager'].includes(role),
-      create: role === 'SuperAdmin' || ['CompanyAdmin', 'Admin'].includes(role),
-      edit:   role === 'SuperAdmin' || ['CompanyAdmin', 'Admin', 'Manager'].includes(role),
+      view:   role === 'SuperAdmin' || ['CompanyAdmin', 'Manager'].includes(role),
+      create: role === 'SuperAdmin' || role === 'CompanyAdmin',
+      edit:   role === 'SuperAdmin' || ['CompanyAdmin', 'Manager'].includes(role),
       delete: role === 'SuperAdmin' || role === 'CompanyAdmin',
     };
     return acc;
@@ -63,12 +64,15 @@ const ROLE_META: Record<UserRole, {
 }> = {
   SuperAdmin:   { color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', description: 'Full platform access. Manages all companies, users and system config.', scope: 'Platform-wide' },
   CompanyAdmin: { color: 'text-primary',    bg: 'bg-primary/10',    border: 'border-primary/20',    description: 'Full access within their company. Manages orgs, agents and billing.', scope: 'Company-wide' },
-  Admin:        { color: 'text-rose-400',   bg: 'bg-rose-500/10',   border: 'border-rose-500/20',   description: 'Administrative access within an organization scope.', scope: 'Organization' },
   Manager:      { color: 'text-sky-400',    bg: 'bg-sky-500/10',    border: 'border-sky-500/20',    description: 'Manages daily operations, shipments and team members.', scope: 'Organization' },
   Dispatcher:   { color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20',  description: 'Handles shipment dispatch, fleet assignment and order routing.', scope: 'Department' },
   Operator:     { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', description: 'Manages fleet operations and dispatch activities.', scope: 'Department' },
   Agent:        { color: 'text-teal-400',   bg: 'bg-teal-500/10',   border: 'border-teal-500/20',   description: 'Field agent with view access to shipments and orders.', scope: 'Organization' },
   Staff:        { color: 'text-muted-foreground', bg: 'bg-muted/40', border: 'border-border/40',    description: 'General staff with limited read-only access.', scope: 'Organization' },
+  CustomsAgent: { color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', description: 'Customs clearance and compliance workflow access.', scope: 'Company' },
+  PortAgent:    { color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', description: 'Port, vessel, manifest and cargo handling access.', scope: 'Port' },
+  CustomerPortal: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', description: 'Customer self-service access for bookings and tracking.', scope: 'Customer' },
+  AuditorReadOnly: { color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', description: 'Read-only audit access across operational records.', scope: 'Audit' },
 };
 
 const ACTION_COLORS: Record<PermissionAction, string> = {

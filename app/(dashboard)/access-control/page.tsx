@@ -20,7 +20,11 @@ import type { UserRole } from '@/data/mockData';
 export default function AccessControlPage() {
   const { user, isSuperAdmin, isCompanyAdmin, canManageAgents, allowedMenuItems } = useAuth();
 
-  const allRoles: UserRole[] = ['SuperAdmin', 'CompanyAdmin', 'Manager', 'Dispatcher', 'Agent', 'Staff', 'Operator', 'Admin'];
+  const allRoles: UserRole[] = [
+    'SuperAdmin', 'CompanyAdmin', 'Manager',
+    'Dispatcher', 'Operator', 'Agent', 'Staff',
+    'CustomsAgent', 'PortAgent', 'CustomerPortal', 'AuditorReadOnly',
+  ];
   const allMenuItems = Array.from(
     new Set(
       Object.values(roleMenuConfig).flatMap(items => items)
@@ -43,7 +47,7 @@ export default function AccessControlPage() {
   return (
     <PageWrapper
       title="Access Control Verification"
-      subtitle="Dashboard access control matrix for all user roles"
+      description="Dashboard access control matrix for all user roles"
     >
       <div className="space-y-6">
         {/* Current User Info */}

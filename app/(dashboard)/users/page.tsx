@@ -18,7 +18,7 @@ import {
   DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getUsers, createUser, deleteUser } from "@/services/userService";
-import { type User } from "@/data/mockData";
+import { type User, type UserRole } from "@/data/mockData";
 import { formatDate } from "@/lib/utils";
 import {
   Plus, Search, SlidersHorizontal, MoreHorizontal,
@@ -53,16 +53,29 @@ const FieldLabel = ({ htmlFor, children }: { htmlFor?: string; children: React.R
 );
 
 // ── Role config ──────────────────────────────
-const ROLE_CONFIG: Record<string, { color: string; dot: string }> = {
-  Admin:      { color: 'bg-red-500/10 border-red-500/20 text-red-400',     dot: 'bg-red-400' },
-  Manager:    { color: 'bg-sky-500/10 border-sky-500/20 text-sky-400',     dot: 'bg-sky-400' },
+const ROLE_CONFIG: Record<UserRole, { color: string; dot: string }> = {
+  SuperAdmin: { color: 'bg-violet-500/10 border-violet-500/20 text-violet-400', dot: 'bg-violet-400' },
+  CompanyAdmin: { color: 'bg-primary/10 border-primary/20 text-primary', dot: 'bg-primary' },
+  Manager: { color: 'bg-sky-500/10 border-sky-500/20 text-sky-400', dot: 'bg-sky-400' },
   Dispatcher: { color: 'bg-amber-500/10 border-amber-500/20 text-amber-400', dot: 'bg-amber-400' },
-  Staff:      { color: 'bg-muted/60 border-border/60 text-muted-foreground', dot: 'bg-muted-foreground' },
+  Operator: { color: 'bg-orange-500/10 border-orange-500/20 text-orange-400', dot: 'bg-orange-400' },
+  Agent: { color: 'bg-teal-500/10 border-teal-500/20 text-teal-400', dot: 'bg-teal-400' },
+  Staff: { color: 'bg-muted/60 border-border/60 text-muted-foreground', dot: 'bg-muted-foreground' },
+  CustomsAgent: { color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400', dot: 'bg-indigo-400' },
+  PortAgent: { color: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400', dot: 'bg-cyan-400' },
+  CustomerPortal: { color: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', dot: 'bg-emerald-400' },
+  AuditorReadOnly: { color: 'bg-slate-500/10 border-slate-500/20 text-slate-400', dot: 'bg-slate-400' },
 };
 
-const getRoleConfig = (role: string) => ROLE_CONFIG[role] ?? ROLE_CONFIG.Staff;
+const USER_ROLE_OPTIONS: UserRole[] = [
+  'SuperAdmin', 'CompanyAdmin', 'Manager',
+  'Dispatcher', 'Operator', 'Agent', 'Staff',
+  'CustomsAgent', 'PortAgent', 'CustomerPortal', 'AuditorReadOnly',
+];
 
-function RoleBadge({ role }: { role: string }) {
+const getRoleConfig = (role: UserRole) => ROLE_CONFIG[role] ?? ROLE_CONFIG.Staff;
+
+function RoleBadge({ role }: { role: UserRole }) {
   const { color } = getRoleConfig(role);
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.7rem] font-bold border ${color}`}>
@@ -164,8 +177,8 @@ export default function UsersPage() {
       valueColor: 'text-green-400',
     },
     {
-      label: 'Admins',
-      value: users.filter(u => u.role === "Admin").length,
+      label: 'Company Admins',
+      value: users.filter(u => u.role === "CompanyAdmin").length,
       icon: <Shield size={18} />,
       color: 'bg-red-500/10 border-red-500/15 text-red-400',
       valueColor: 'text-red-400',
@@ -342,7 +355,7 @@ export default function UsersPage() {
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent className="nb-dropdown">
-                {['all', 'Admin', 'Manager', 'Dispatcher', 'Staff'].map(v => (
+                {['all', ...USER_ROLE_OPTIONS].map(v => (
                   <SelectItem key={v} value={v} className="text-[0.82rem]">
                     {v === 'all' ? 'All Roles' : v}
                   </SelectItem>
@@ -438,7 +451,7 @@ export default function UsersPage() {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent className="nb-dropdown">
-                    {['Admin', 'Manager', 'Dispatcher', 'Staff'].map(r => (
+                    {USER_ROLE_OPTIONS.map(r => (
                       <SelectItem key={r} value={r} className="text-[0.82rem]">{r}</SelectItem>
                     ))}
                   </SelectContent>

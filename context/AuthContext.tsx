@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<AuthResponse>;
+  login: (username: string, password: string, router?: NavigationRouter) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   hasPermission: (module: string, action: PermissionAction) => boolean;
   allowedMenuItems: string[];
@@ -23,6 +23,10 @@ interface AuthContextType {
   getCurrentOrganizationId: () => string | null;
 }
 
+interface NavigationRouter {
+  push: (href: string) => void;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -31,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for existing session
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem('user') ?? localStorage.getItem('loggedInUser');
     const token = localStorage.getItem('token');
     
     if (storedUser && token) {
@@ -40,10 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (username: string, password: string): Promise<AuthResponse> => {
+  const login = useCallback(async (username: string, password: string, router?: NavigationRouter): Promise<AuthResponse> => {
     setIsLoading(true);
     try {
-      const response = await loginService({ username, password });
+      const response = await loginService({ username, password }, router);
       
       if (response.success && response.user && response.token) {
         localStorage.setItem('user', JSON.stringify(response.user));
@@ -63,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await logoutService();
     } finally {
       localStorage.removeItem('user');
+      localStorage.removeItem('loggedInUser');
       localStorage.removeItem('token');
       setUser(null);
       setIsLoading(false);
