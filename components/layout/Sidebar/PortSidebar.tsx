@@ -33,9 +33,9 @@ const portMenu: MenuItem[] = [
     label: 'Arrivals & Departures',
     icon: Ship,
     children: [
-      { id: 'vessels', label: 'Vessel Schedule', icon: Ship, href: '/port/vessels' },
-      { id: 'flights', label: 'Flight Schedule', icon: Plane, href: '/port/flights' },
-      { id: 'berths', label: 'Berth Allocation', icon: Anchor, href: '/port/berths' },
+      { id: 'vessels', label: 'Vessel Schedule', icon: Ship, href: '/port/arrivals-departures/vessels' },
+      { id: 'flights', label: 'Flight Schedule', icon: Plane, href: '/port/arrivals-departures/flights' },
+      { id: 'berths', label: 'Berth Allocation', icon: Anchor, href: '/port/arrivals-departures/berths' },
     ],
   },
   {
