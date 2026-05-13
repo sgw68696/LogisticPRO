@@ -7,6 +7,11 @@ interface NavigationRouter {
   push: (href: string) => void;
 }
 
+interface StoredLoggedInUser {
+  role?: User['role'];
+  dashboardRoute?: string;
+}
+
 export interface LoginCredentials {
   username: string;
   password: string;
@@ -78,6 +83,19 @@ export const logout = async (): Promise<void> => {
     method: 'POST',
     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
   });
+};
+
+export const getCompanyRouteRedirect = (): string | null => {
+  const storedUser = localStorage.getItem('loggedInUser') ?? localStorage.getItem('user');
+  if (!storedUser) return '/login';
+
+  try {
+    const parsedUser = JSON.parse(storedUser) as StoredLoggedInUser;
+    if (parsedUser.role === 'CompanyAdmin') return null;
+    return parsedUser.dashboardRoute ?? '/login';
+  } catch {
+    return '/login';
+  }
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
