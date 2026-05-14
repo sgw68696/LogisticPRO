@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   ChevronLeft, ChevronRight, LogOut, ChevronDown,
   LayoutDashboard, Ship, Plane, Anchor, Package, FileText,
-  ArrowLeftRight, DollarSign, Folder, BarChart2, Bell,
+  ArrowLeftRight, DollarSign, Folder, BarChart2, Bell, Plus,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Image from 'next/image';
@@ -44,6 +44,7 @@ const portMenu: MenuItem[] = [
     icon: Package,
     children: [
       { id: 'containers', label: 'Container List', icon: Package, href: '/port/containers' },
+      { id: 'register-container', label: 'Register Container', icon: Plus, href: '/port/containers/register' },
       { id: 'manifests', label: 'Cargo Manifest', icon: FileText, href: '/port/manifests' },
       { id: 'cargo-log', label: 'Offload / Load Log', icon: ArrowLeftRight, href: '/port/cargo-log' },
     ],
