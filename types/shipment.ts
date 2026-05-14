@@ -1,6 +1,4 @@
-// ============================================
-// SHARED SHIPMENT TYPES — used across all roles
-// ============================================
+import type { BookingStatus } from './enums';
 
 export type ShipmentStatus =
   | 'Pending' | 'Picked Up' | 'In Transit' | 'Out for Delivery'
@@ -120,7 +118,6 @@ export interface ConsolidatedShipment {
   onTimeStatus: 'On Time' | 'Delayed' | 'Early' | null;
 }
 
-// Role-based view filters
 export type ShipmentViewRole =
   | 'SuperAdmin' | 'CompanyAdmin' | 'Manager' | 'Dispatcher' | 'Operator'
   | 'Warehouse' | 'Driver' | 'Finance' | 'Support' | 'Customs'
@@ -142,3 +139,49 @@ export interface ShipmentDashboardStats {
   totalRevenue: number;
   totalCost: number;
 }
+
+export interface LegacyShipment {
+  id: string;
+  trackingNumber: string;
+  senderName: string;
+  senderPhone: string;
+  senderEmail: string;
+  receiverName: string;
+  receiverPhone: string;
+  receiverEmail: string;
+  pickupAddress: string;
+  deliveryAddress: string;
+  packageWeight: number;
+  packageDimensions: string;
+  packageType: string;
+  serviceType: ServiceType;
+  status: ShipmentStatus;
+  assignedDriver: string | null;
+  assignedVehicle: string | null;
+  estimatedDelivery: string;
+  actualDelivery: string | null;
+  createdAt: string;
+  updatedAt: string;
+  notes: string;
+  proofOfDelivery: string | null;
+  timeline: { status: string; timestamp: string; location: string; notes: string }[];
+}
+
+export const BOOKING_TO_SHIPMENT_STATUS: Record<BookingStatus, ShipmentStatus | null> = {
+  Draft: 'Pending',
+  Confirmed: 'Pending',
+  Processing: 'Pending',
+  Shipped: 'In Transit',
+  Delivered: 'Delivered',
+  Cancelled: 'Cancelled',
+};
+
+export const SHIPMENT_TO_BOOKING_STATUS: Record<ShipmentStatus, BookingStatus> = {
+  Pending: 'Confirmed',
+  'Picked Up': 'Processing',
+  'In Transit': 'Shipped',
+  'Out for Delivery': 'Shipped',
+  Delivered: 'Delivered',
+  Cancelled: 'Cancelled',
+  Failed: 'Cancelled',
+};

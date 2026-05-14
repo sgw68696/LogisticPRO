@@ -1,142 +1,152 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { DataTable, type Column } from '@/components/shared/DataTable';
-import { KPICard } from '@/components/shared/KPICard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { Badge } from '@/components/ui/badge';
+import { KPICard } from '@/components/shared/KPICard';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { shipmentService } from '@/services/shipment/shipmentService';
+import { formatDate } from '@/lib/shipment-utils/formatting';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock3,
-  MapPinned,
-  Package,
-  Search,
-  Ship,
-  Truck,
-  Plane,
-  Train,
-  Filter,
+  AlertTriangle, CheckCircle2, Clock3, MapPinned,
+  Package, Search, Ship, Truck, Plane, Filter, X,
 } from 'lucide-react';
-import { mockShipments } from '@/data/mockData';
+import type { ConsolidatedShipment } from '@/types/shipment';
 
-type ShipmentRow = {
-  id: string;
-  customer: string;
-  route: string;
-  mode: string;
-  service: string;
-  eta: string;
-  status: string;
+const getModeIcon = (mode: string) => {
+  switch (mode) {
+    case 'Sea': return <Ship className="w-4 h-4" />;
+    case 'Air': return <Plane className="w-4 h-4" />;
+    default: return <Truck className="w-4 h-4" />;
+  }
 };
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value));
-
-const routeFromShipment = (pickup: string, delivery: string) => {
-  const from = pickup.split(',').at(-1)?.trim() ?? pickup;
-  const to = delivery.split(',').at(-1)?.trim() ?? delivery;
-  return `${from} to ${to}`;
-};
-
-const getMode = (serviceType?: string) => {
-  const value = String(serviceType || '').toLowerCase();
-  if (value.includes('air')) return 'Air';
-  if (value.includes('sea')) return 'Sea';
-  if (value.includes('rail')) return 'Rail';
-  return 'Road';
-};
-
-const modeIcon = (mode: string) => {
-  if (mode === 'Sea') return <Ship className="w-4 h-4" />;
-  if (mode === 'Air') return <Plane className="w-4 h-4" />;
-  if (mode === 'Rail') return <Train className="w-4 h-4" />;
-  return <Truck className="w-4 h-4" />;
+const getMode = (transportMode: string) => {
+  switch (transportMode) {
+    case 'Water': return 'Sea';
+    case 'Air': return 'Air';
+    default: return 'Land';
+  }
 };
 
 export default function CompanyShipmentsPage() {
+  const [shipments, setShipments] = useState<ConsolidatedShipment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stage, setStage] = useState('Show All');
 
-  const rows: ShipmentRow[] = mockShipments.map((shipment) => ({
-    id: shipment.trackingNumber,
-    customer: shipment.customerName || shipment.customer || 'Customer',
-    route: routeFromShipment(shipment.pickupAddress, shipment.deliveryAddress),
-    mode: getMode(shipment.serviceType),
-    service: shipment.serviceType,
-    eta: formatDate(shipment.estimatedDelivery),
-    status: shipment.status,
-  }));
+  useEffect(() => {
+    shipmentService.list({ role: 'CompanyAdmin' }).then((data) => {
+      setShipments(data);
+      setLoading(false);
+    });
+  }, []);
 
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
+  const filtered = useMemo(() => {
+    return shipments.filter((s) => {
       const q = search.toLowerCase();
       const matchesSearch =
         !q ||
-        row.id.toLowerCase().includes(q) ||
-        row.customer.toLowerCase().includes(q) ||
-        row.route.toLowerCase().includes(q);
+        s.trackingNumber.toLowerCase().includes(q) ||
+        s.customerName.toLowerCase().includes(q) ||
+        s.route.origin.toLowerCase().includes(q) ||
+        s.route.destination.toLowerCase().includes(q);
 
       const matchesStage =
         stage === 'Show All' ||
-        row.status.toLowerCase() === stage.toLowerCase() ||
-        (stage === 'Sailing' && ['In Transit', 'On Route'].includes(row.status)) ||
-        (stage === 'Arrived' && row.status === 'Delivered');
+        s.status === stage ||
+        (stage === 'Sailing' && ['In Transit', 'Picked Up'].includes(s.status)) ||
+        (stage === 'Arrived' && s.status === 'Delivered');
 
       return matchesSearch && matchesStage;
     });
-  }, [rows, search, stage]);
+  }, [shipments, search, stage]);
 
-  const activeShipments = rows.filter((r) => !['Delivered', 'Cancelled', 'Failed'].includes(r.status)).length;
-  const inTransit = rows.filter((r) => ['In Transit', 'On Route', 'Confirmed'].includes(r.status)).length;
-  const delayed = rows.filter((r) => ['Pending', 'Failed'].includes(r.status)).length;
-  const delivered = rows.filter((r) => r.status === 'Delivered').length;
+  const activeShipments = shipments.filter((s) => !['Delivered', 'Cancelled', 'Failed'].includes(s.status)).length;
+  const inTransit = shipments.filter((s) => ['In Transit', 'Picked Up'].includes(s.status)).length;
+  const delayed = shipments.filter((s) => ['Failed', 'Cancelled'].includes(s.status)).length;
+  const delivered = shipments.filter((s) => s.status === 'Delivered').length;
 
-  const columns: Column<ShipmentRow>[] = [
-    { key: 'id', header: 'Tracking ID', sortable: true },
-    { key: 'customer', header: 'Customer', sortable: true },
-    { key: 'route', header: 'Route', sortable: true },
+  const columns: Column<ConsolidatedShipment>[] = [
     {
-      key: 'mode',
-      header: 'Mode',
-      render: (item) => (
-        <Badge variant="outline" className="gap-1">
-          {modeIcon(item.mode)}
-          {item.mode}
-        </Badge>
+      key: 'trackingNumber',
+      header: 'Tracking ID',
+      sortable: true,
+      render: (s) => <span className="text-xs font-mono font-semibold text-foreground">{s.trackingNumber}</span>,
+    },
+    {
+      key: 'customerName',
+      header: 'Customer',
+      sortable: true,
+      render: (s) => <span className="text-xs text-foreground">{s.customerName}</span>,
+    },
+    {
+      key: 'route',
+      header: 'Route',
+      render: (s) => (
+        <span className="text-xs text-muted-foreground">{s.route.origin} → {s.route.destination}</span>
       ),
     },
-    { key: 'service', header: 'Service', sortable: true },
-    { key: 'eta', header: 'ETA', sortable: true },
+    {
+      key: 'route.transportMode',
+      header: 'Mode',
+      render: (s) => {
+        const mode = getMode(s.route.transportMode);
+        return (
+          <Badge variant="outline" className="gap-1 text-[0.6rem]">
+            {getModeIcon(mode)}
+            {mode}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'serviceType',
+      header: 'Service',
+      sortable: true,
+      render: (s) => <span className="text-xs text-muted-foreground">{s.serviceType}</span>,
+    },
+    {
+      key: 'estimatedDelivery',
+      header: 'ETA',
+      sortable: true,
+      render: (s) => <span className="text-xs text-muted-foreground">{formatDate(s.estimatedDelivery)}</span>,
+    },
     {
       key: 'status',
       header: 'Status',
       sortable: true,
-      render: (item) => <StatusBadge status={item.status} />,
+      render: (s) => <StatusBadge status={s.status} />,
     },
   ];
 
   const stageTabs = [
-    { label: 'Show All', count: rows.length },
-    { label: 'New', count: rows.filter((r) => r.status === 'Pending').length },
-    { label: 'Booked', count: rows.filter((r) => r.status === 'Confirmed').length },
-    { label: 'Sailing', count: rows.filter((r) => ['In Transit', 'On Route'].includes(r.status)).length },
-    { label: 'Arrived', count: rows.filter((r) => r.status === 'Delivered').length },
+    { label: 'Show All', count: shipments.length },
+    { label: 'Pending', count: shipments.filter((s) => s.status === 'Pending').length },
+    { label: 'Booked', count: shipments.filter((s) => s.status === 'Picked Up').length },
+    { label: 'Sailing', count: shipments.filter((s) => ['In Transit', 'Picked Up'].includes(s.status)).length },
+    { label: 'Arrived', count: shipments.filter((s) => s.status === 'Delivered').length },
   ];
+
+  if (loading) {
+    return (
+      <PageWrapper title="Shipments">
+        <LoadingState rows={8} message="Loading shipments..." />
+      </PageWrapper>
+    );
+  }
 
   return (
     <PageWrapper title="Shipments">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <KPICard title="Active Shipments" value={activeShipments} icon={<Package className="w-5 h-5" />} iconColor="indigo" />
         <KPICard title="In Transit" value={inTransit} icon={<MapPinned className="w-5 h-5" />} iconColor="teal" />
-        <KPICard title="Delayed / Risk" value={delayed} icon={<AlertTriangle className="w-5 h-5" />} iconColor="amber" />
+        <KPICard title="Issues" value={delayed} icon={<AlertTriangle className="w-5 h-5" />} iconColor="amber" />
         <KPICard title="Delivered" value={delivered} icon={<CheckCircle2 className="w-5 h-5" />} iconColor="green" />
       </div>
 
@@ -151,18 +161,22 @@ export default function CompanyShipmentsPage() {
                 placeholder="Search shipment, customer, or route..."
                 className="w-full rounded-md border border-border bg-muted/30 pl-10 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-
             <div className="flex flex-wrap gap-2">
               {stageTabs.map((tab) => (
                 <Button
                   key={tab.label}
                   variant={stage === tab.label ? 'default' : 'outline'}
                   onClick={() => setStage(tab.label)}
-                  className="gap-2"
+                  className="gap-2 text-xs"
                 >
                   {tab.label}
-                  <Badge variant="secondary">{tab.count}</Badge>
+                  <Badge variant="secondary" className="text-[0.6rem]">{tab.count}</Badge>
                 </Button>
               ))}
             </div>
@@ -177,24 +191,27 @@ export default function CompanyShipmentsPage() {
           </CardHeader>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {filteredRows.slice(0, 3).map((row) => (
-                <div key={row.id} className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <Badge variant="outline" className="gap-1">
-                      {modeIcon(row.mode)}
-                      {row.mode}
-                    </Badge>
-                    <StatusBadge status={row.status} />
+              {filtered.slice(0, 3).map((s) => {
+                const mode = getMode(s.route.transportMode);
+                return (
+                  <div key={s.id} className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <Badge variant="outline" className="gap-1 text-[0.6rem]">
+                        {getModeIcon(mode)}
+                        {mode}
+                      </Badge>
+                      <StatusBadge status={s.status} />
+                    </div>
+                    <p className="font-semibold text-sm">{s.trackingNumber}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{s.customerName}</p>
+                    <p className="text-sm mt-2">{s.route.origin} → {s.route.destination}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
+                      <Clock3 className="w-3.5 h-3.5" />
+                      ETA: {formatDate(s.estimatedDelivery)}
+                    </div>
                   </div>
-                  <p className="font-semibold text-sm">{row.id}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{row.customer}</p>
-                  <p className="text-sm mt-2">{row.route}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-                    <Clock3 className="w-3.5 h-3.5" />
-                    ETA: {row.eta}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -218,7 +235,7 @@ export default function CompanyShipmentsPage() {
                 <MapPinned className="w-5 h-5 text-blue-500 mt-0.5" />
                 <div>
                   <p className="font-medium text-sm">Live Tracking Available</p>
-                  <p className="text-sm text-muted-foreground mt-1">12 active shipments are broadcasting location updates.</p>
+                  <p className="text-sm text-muted-foreground mt-1">{inTransit} active shipments are broadcasting location updates.</p>
                 </div>
               </div>
             </div>
@@ -231,29 +248,41 @@ export default function CompanyShipmentsPage() {
                 </div>
               </div>
             </div>
-            <Button className="w-full">Open Live Map</Button>
+            <Button className="w-full" variant="outline">Open Live Map</Button>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-border/60 bg-card shadow-soft">
-        <CardHeader className="border-b border-border/50 pb-4 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">All Shipments</CardTitle>
-          <Button variant="outline" className="gap-2">
-            <Filter className="w-4 h-4" />
-            More Filters
-          </Button>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <DataTable
-            data={filteredRows}
-            columns={columns}
-            pageSize={10}
-            searchKey="id"
-            searchPlaceholder="Search shipments..."
-          />
-        </CardContent>
-      </Card>
+      {filtered.length === 0 ? (
+        <Card className="border-border/60 bg-card shadow-soft">
+          <CardContent>
+            <EmptyState
+              icon={<Package className="w-8 h-8" />}
+              title="No shipments found"
+              description="No shipments match your current search or filter criteria."
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-border/60 bg-card shadow-soft">
+          <CardHeader className="border-b border-border/50 pb-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-base">All Shipments</CardTitle>
+            <Button variant="outline" className="gap-2 text-xs">
+              <Filter className="w-4 h-4" />
+              More Filters
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <DataTable
+              data={filtered}
+              columns={columns}
+              pageSize={10}
+              searchKey="trackingNumber"
+              searchPlaceholder="Search shipments..."
+            />
+          </CardContent>
+        </Card>
+      )}
     </PageWrapper>
   );
 }

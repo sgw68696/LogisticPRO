@@ -1,6 +1,21 @@
 // MOCK DATA FOR LOGISTICS MANAGEMENT SYSTEM
+//
+// NOTE: Shared types are now centralized in /types/ (e.g. @/types/shipment, @/types/driver, etc.)
+// Existing code importing from this file continues to work.
+// NEW code should import types from @/types/* for consistency.
 
+// ============================================
+// RE-EXPORT SHARED TYPES (backward compatible)
+// ============================================
+export type { ConsolidatedShipment, LegacyShipment, ShipmentDashboardStats, ShipmentViewRole } from '@/types/shipment';
+export type { Container, ContainerEvent } from '@/types/container';
+export type { FleetVehicle } from '@/types/vehicle';
+export type { PortalNotification } from '@/types/user';
+export type { BookingStatus, MilestoneStatus } from '@/types/enums';
+
+// ============================================
 // MULTI-TENANCY & ENTERPRISE TYPES
+// ============================================
 export type CompanyStatus = 'Active' | 'Pending' | 'Suspended' | 'Inactive';
 export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
 export type UserRole =
@@ -1714,6 +1729,9 @@ export const mockAnalytics = {
     { type: 'Tempo', total: 3, active: 2, maintenance: 0 },
   ],
 };
+
+// NOTE: roleMenuConfig and rolePermissions below are retained for backward compatibility.
+// NEW code should use the canonical permission source at @/config/permissions.
 
 // Role-based menu configuration
 export const roleMenuConfig: Record<UserRole, string[]> = {

@@ -2,7 +2,6 @@ import { mockShipments, mockInvoices, mockNotifications, mockCustomers } from '.
 import type {
   PortalBooking, PortalPayment, PortalSupportTicket,
   PortalDocument, PortalTrackingEvent, PortalDashboardStats,
-  PortalBookingStatus,
 } from '@/types/portal';
 
 const CUSTOMER_ID = 'cust-001';

@@ -1,41 +1,44 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { SkeletonLoader } from '@/components/shared/SkeletonLoader';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { shipmentService } from '@/services/shipment/shipmentService';
+import { formatDate } from '@/lib/shipment-utils/formatting';
 import {
   Package, ArrowLeft, MapPin, Clock, CheckCircle2, Truck,
   Phone, Mail, User, Weight, Ruler, FileText, CalendarDays,
   CircleCheck, CircleDot, Navigation, AlertTriangle,
 } from 'lucide-react';
-import { portalShipments } from '@/data/portal-mock-data';
-
-const STATUS_PILLS: Record<string, string> = {
-  Delivered: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  'In Transit': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  'Out for Delivery': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  Pending: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-  'Picked Up': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-  Cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
-  Failed: 'bg-red-500/10 text-red-400 border-red-500/20',
-};
+import type { ConsolidatedShipment } from '@/types/shipment';
 
 export default function PortalShipmentDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [loading] = useState(false);
+  const [shipment, setShipment] = useState<ConsolidatedShipment | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const shipment = useMemo(() =>
-    portalShipments.find(s => s.id === params.id || s.trackingNumber === params.id),
-    [params.id]
-  );
+  useEffect(() => {
+    if (params.id) {
+      shipmentService.getById(params.id as string).then((data) => {
+        setShipment(data);
+        setLoading(false);
+      });
+    }
+  }, [params.id]);
 
-  if (loading) return <PageWrapper title="Loading..."><SkeletonLoader variant="card" count={3} /></PageWrapper>;
+  if (loading) {
+    return (
+      <PageWrapper title="Loading...">
+        <LoadingState rows={5} message="Loading shipment details..." />
+      </PageWrapper>
+    );
+  }
 
   if (!shipment) {
     return (
@@ -49,7 +52,6 @@ export default function PortalShipmentDetailPage() {
     );
   }
 
-  const meta = STATUS_PILLS[shipment.status] || STATUS_PILLS.Pending;
   const timelineSteps = ['Order Created', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered'];
 
   return (
@@ -62,7 +64,6 @@ export default function PortalShipmentDetailPage() {
         </Button>
       }
     >
-      {/* Status Header */}
       <div className="bg-card border border-border/60 rounded-xl shadow-soft p-5 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -72,7 +73,7 @@ export default function PortalShipmentDetailPage() {
             <div>
               <h2 className="text-lg font-bold text-foreground font-mono">{shipment.trackingNumber}</h2>
               <div className="flex items-center gap-2 mt-0.5">
-                <Badge variant="outline" className={`text-[0.65rem] px-2 py-0.5 border ${meta}`}>{shipment.status}</Badge>
+                <StatusBadge status={shipment.status} />
                 <span className="text-xs text-muted-foreground">{shipment.serviceType}</span>
               </div>
             </div>
@@ -80,16 +81,12 @@ export default function PortalShipmentDetailPage() {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Estimated Delivery</p>
-              <p className="text-sm font-semibold text-foreground">
-                {new Date(shipment.estimatedDelivery).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </p>
+              <p className="text-sm font-semibold text-foreground">{formatDate(shipment.estimatedDelivery, { day: '2-digit', month: 'short', year: 'numeric' })}</p>
             </div>
             {shipment.actualDelivery && (
               <div className="text-right">
                 <p className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Actual Delivery</p>
-                <p className="text-sm font-semibold text-emerald-400">
-                  {new Date(shipment.actualDelivery).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </p>
+                <p className="text-sm font-semibold text-emerald-400">{formatDate(shipment.actualDelivery, { day: '2-digit', month: 'short', year: 'numeric' })}</p>
               </div>
             )}
           </div>
@@ -97,9 +94,7 @@ export default function PortalShipmentDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Timeline + Route */}
         <div className="xl:col-span-2 space-y-6">
-          {/* Timeline */}
           <Card className="border border-border/60 shadow-soft">
             <CardHeader className="py-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -112,7 +107,6 @@ export default function PortalShipmentDetailPage() {
                 <div className="space-y-0">
                   {shipment.timeline.map((event, idx) => {
                     const isLast = idx === 0;
-                    const done = true;
                     return (
                       <div key={idx} className="relative flex gap-4 pb-5 last:pb-0">
                         <div className="relative z-10 flex-shrink-0 mt-0.5">
@@ -138,7 +132,6 @@ export default function PortalShipmentDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Progress Steps */}
           <Card className="border border-border/60 shadow-soft">
             <CardHeader className="py-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -165,9 +158,7 @@ export default function PortalShipmentDetailPage() {
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Route */}
           <Card className="border border-border/60 shadow-soft">
             <CardHeader className="py-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -180,14 +171,15 @@ export default function PortalShipmentDetailPage() {
                   <div className="w-2 h-2 rounded-full bg-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Pickup</p>
-                  <p className="text-xs text-foreground">{shipment.pickupAddress}</p>
+                  <p className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Origin</p>
+                  <p className="text-xs text-foreground">{shipment.route.origin}</p>
+                  <p className="text-[0.6rem] text-muted-foreground">{shipment.sender.address}, {shipment.sender.city}</p>
                 </div>
               </div>
               <div className="ml-3.5 pl-4 border-l-2 border-dashed border-border/40">
                 <div className="flex items-center gap-2 text-[0.65rem] text-muted-foreground">
                   <Truck className="w-3 h-3" />
-                  <span>{shipment.serviceType} Service</span>
+                  <span>{shipment.serviceType} Service · {shipment.route.transportMode} · {shipment.route.distance} {shipment.route.distanceUnit}</span>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -195,14 +187,14 @@ export default function PortalShipmentDetailPage() {
                   <div className="w-2 h-2 rounded-full bg-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Delivery</p>
-                  <p className="text-xs text-foreground">{shipment.deliveryAddress}</p>
+                  <p className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Destination</p>
+                  <p className="text-xs text-foreground">{shipment.route.destination}</p>
+                  <p className="text-[0.6rem] text-muted-foreground">{shipment.receiver.address}, {shipment.receiver.city}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Shipment Info */}
           <Card className="border border-border/60 shadow-soft">
             <CardHeader className="py-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -213,25 +205,24 @@ export default function PortalShipmentDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-[0.55rem] font-bold uppercase tracking-wider text-muted-foreground">Weight</p>
-                  <p className="text-xs text-foreground font-medium flex items-center gap-1"><Weight className="w-3 h-3 text-muted-foreground" />{shipment.packageWeight} kg</p>
+                  <p className="text-xs text-foreground font-medium flex items-center gap-1"><Weight className="w-3 h-3 text-muted-foreground" />{shipment.package.weight} {shipment.package.weightUnit}</p>
                 </div>
                 <div>
                   <p className="text-[0.55rem] font-bold uppercase tracking-wider text-muted-foreground">Dimensions</p>
-                  <p className="text-xs text-foreground font-medium flex items-center gap-1"><Ruler className="w-3 h-3 text-muted-foreground" />{shipment.packageDimensions}</p>
+                  <p className="text-xs text-foreground font-medium flex items-center gap-1"><Ruler className="w-3 h-3 text-muted-foreground" />{shipment.package.dimensions}</p>
                 </div>
                 <div>
                   <p className="text-[0.55rem] font-bold uppercase tracking-wider text-muted-foreground">Type</p>
-                  <p className="text-xs text-foreground font-medium">{shipment.packageType}</p>
+                  <p className="text-xs text-foreground font-medium">{shipment.package.type}</p>
                 </div>
                 <div>
-                  <p className="text-[0.55rem] font-bold uppercase tracking-wider text-muted-foreground">Service</p>
-                  <p className="text-xs text-foreground font-medium">{shipment.serviceType}</p>
+                  <p className="text-[0.55rem] font-bold uppercase tracking-wider text-muted-foreground">Pieces</p>
+                  <p className="text-xs text-foreground font-medium">{shipment.package.pieces}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Sender / Receiver */}
           <Card className="border border-border/60 shadow-soft">
             <CardHeader className="py-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -241,28 +232,29 @@ export default function PortalShipmentDetailPage() {
             <CardContent className="px-5 pb-5 space-y-4">
               <div>
                 <p className="text-[0.55rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">Sender</p>
-                <p className="text-xs font-medium text-foreground">{shipment.senderName}</p>
+                <p className="text-xs font-medium text-foreground">{shipment.sender.name}</p>
+                {shipment.sender.company && <p className="text-[0.6rem] text-muted-foreground">{shipment.sender.company}</p>}
                 <div className="flex items-center gap-2 mt-0.5 text-[0.65rem] text-muted-foreground">
-                  <Phone className="w-2.5 h-2.5" />{shipment.senderPhone}
+                  <Phone className="w-2.5 h-2.5" />{shipment.sender.phone}
                 </div>
                 <div className="flex items-center gap-2 text-[0.65rem] text-muted-foreground">
-                  <Mail className="w-2.5 h-2.5" />{shipment.senderEmail}
+                  <Mail className="w-2.5 h-2.5" />{shipment.sender.email}
                 </div>
               </div>
               <div className="border-t border-border/40 pt-3">
                 <p className="text-[0.55rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">Receiver</p>
-                <p className="text-xs font-medium text-foreground">{shipment.receiverName}</p>
+                <p className="text-xs font-medium text-foreground">{shipment.receiver.name}</p>
+                {shipment.receiver.company && <p className="text-[0.6rem] text-muted-foreground">{shipment.receiver.company}</p>}
                 <div className="flex items-center gap-2 mt-0.5 text-[0.65rem] text-muted-foreground">
-                  <Phone className="w-2.5 h-2.5" />{shipment.receiverPhone}
+                  <Phone className="w-2.5 h-2.5" />{shipment.receiver.phone}
                 </div>
                 <div className="flex items-center gap-2 text-[0.65rem] text-muted-foreground">
-                  <Mail className="w-2.5 h-2.5" />{shipment.receiverEmail}
+                  <Mail className="w-2.5 h-2.5" />{shipment.receiver.email}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Dates */}
           <Card className="border border-border/60 shadow-soft">
             <CardHeader className="py-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -272,22 +264,21 @@ export default function PortalShipmentDetailPage() {
             <CardContent className="px-5 pb-5 space-y-2">
               <div className="flex justify-between">
                 <span className="text-[0.6rem] text-muted-foreground">Created</span>
-                <span className="text-xs text-foreground font-medium">{new Date(shipment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                <span className="text-xs text-foreground font-medium">{formatDate(shipment.createdAt, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[0.6rem] text-muted-foreground">Estimated Delivery</span>
-                <span className="text-xs text-foreground font-medium">{new Date(shipment.estimatedDelivery).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                <span className="text-xs text-foreground font-medium">{formatDate(shipment.estimatedDelivery, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
               </div>
               {shipment.actualDelivery && (
                 <div className="flex justify-between">
                   <span className="text-[0.6rem] text-muted-foreground">Actual Delivery</span>
-                  <span className="text-xs text-emerald-400 font-medium">{new Date(shipment.actualDelivery).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  <span className="text-xs text-emerald-400 font-medium">{formatDate(shipment.actualDelivery, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Notes */}
           {shipment.notes && (
             <Card className="border border-border/60 shadow-soft">
               <CardHeader className="py-4 px-5">

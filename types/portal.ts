@@ -1,5 +1,7 @@
-export type PortalBookingStatus =
-  | 'Draft' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+import type { ServiceType } from './shipment';
+import type { BookingStatus, InvoiceStatus } from './enums';
+
+export type PortalBookingStatus = BookingStatus;
 
 export type PortalPaymentMethod =
   | 'Credit Card' | 'Debit Card' | 'Net Banking' | 'UPI' | 'Wire Transfer' | 'Cash';
@@ -29,7 +31,7 @@ export interface PortalBooking {
   id: string;
   bookingRef: string;
   customerId: string;
-  serviceType: 'Express' | 'Standard' | 'Freight';
+  serviceType: ServiceType;
   pickupAddress: string;
   deliveryAddress: string;
   packageWeight: number;
