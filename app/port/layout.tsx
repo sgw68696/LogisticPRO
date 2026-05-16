@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { PortSidebar } from '@/components/layout/Sidebar/PortSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { portAgentRoleConfig } from '@/data/menu/sidebar-roles';
+import { portMenu } from '@/data/menu/port-menu';
 
 export default function PortLayout({
   children,
@@ -21,10 +23,8 @@ export default function PortLayout({
       return;
     }
     
-    // Allow only PortAgent role
     if (!isLoading && isAuthenticated && user) {
       if (user.role !== 'PortAgent') {
-        // Redirect to their own dashboard
         const dashboardRoute = localStorage.getItem('loggedInUser') 
           ? JSON.parse(localStorage.getItem('loggedInUser') || '{}').dashboardRoute 
           : '/login';
@@ -50,7 +50,7 @@ export default function PortLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <PortSidebar />
+      <AppSidebar role={portAgentRoleConfig} menuItems={portMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

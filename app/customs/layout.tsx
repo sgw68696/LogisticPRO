@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { CustomsSidebar } from '@/components/layout/Sidebar/CustomsSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { customsAgentRoleConfig } from '@/data/menu/sidebar-roles';
+import { customsMenu } from '@/data/menu/customs-menu';
 
 export default function CustomsLayout({
   children,
@@ -21,10 +23,8 @@ export default function CustomsLayout({
       return;
     }
     
-    // Allow only CustomsAgent role
     if (!isLoading && isAuthenticated && user) {
       if (user.role !== 'CustomsAgent') {
-        // Redirect to their own dashboard
         const dashboardRoute = localStorage.getItem('loggedInUser') 
           ? JSON.parse(localStorage.getItem('loggedInUser') || '{}').dashboardRoute 
           : '/login';
@@ -50,7 +50,7 @@ export default function CustomsLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <CustomsSidebar />
+      <AppSidebar role={customsAgentRoleConfig} menuItems={customsMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

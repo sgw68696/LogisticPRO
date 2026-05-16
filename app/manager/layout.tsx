@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { ManagerSidebar } from '@/components/layout/Sidebar/ManagerSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { managerRoleConfig } from '@/data/menu/sidebar-roles';
+import { managerMenu } from '@/data/menu/manager-menu';
 
 export default function ManagerLayout({
   children,
@@ -42,7 +44,7 @@ export default function ManagerLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <ManagerSidebar />
+      <AppSidebar role={managerRoleConfig} menuItems={managerMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

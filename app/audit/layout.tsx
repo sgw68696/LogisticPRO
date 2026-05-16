@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { AuditorSidebar } from '@/components/layout/Sidebar/AuditorSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { auditorReadOnlyRoleConfig } from '@/data/menu/sidebar-roles';
+import { auditorMenu } from '@/data/menu/auditor-menu';
 
 export default function AuditLayout({
   children,
@@ -52,7 +54,7 @@ export default function AuditLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <AuditorSidebar />
+      <AppSidebar role={auditorReadOnlyRoleConfig} menuItems={auditorMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

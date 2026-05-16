@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { StaffSidebar } from '@/components/layout/Sidebar/StaffSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { staffRoleConfig } from '@/data/menu/sidebar-roles';
+import { staffMenu } from '@/data/menu/staff-menu';
 
 export default function StaffLayout({
   children,
@@ -20,7 +22,6 @@ export default function StaffLayout({
       router.push('/login');
     }
     if (!isLoading && isAuthenticated && user?.role !== 'Staff') {
-      // Redirect non-staff users to their appropriate dashboard
       const roleDashboardMap: Record<string, string> = {
         'SuperAdmin': '/admin/dashboard',
         'CompanyAdmin': '/company/dashboard',
@@ -52,7 +53,7 @@ export default function StaffLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <StaffSidebar />
+      <AppSidebar role={staffRoleConfig} menuItems={staffMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

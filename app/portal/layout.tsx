@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { CustomerPortalSidebar } from '@/components/layout/CustomerPortalSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { customerPortalRoleConfig } from '@/data/menu/sidebar-roles';
+import { customerPortalMenu } from '@/data/menu/customer-portal-menu';
 
 export default function PortalLayout({
   children,
@@ -52,7 +54,7 @@ export default function PortalLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <CustomerPortalSidebar />
+      <AppSidebar role={customerPortalRoleConfig} menuItems={customerPortalMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

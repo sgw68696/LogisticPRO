@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { CompanyAdminSidebar } from '@/components/layout/Sidebar/CompanyAdminSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { companyAdminRoleConfig } from '@/data/menu/sidebar-roles';
+import { companyAdminMenu } from '@/data/menu/company-admin-menu';
 import { getCompanyRouteRedirect } from '@/services/authService';
 
 export default function CompanyLayout({
@@ -47,7 +49,7 @@ export default function CompanyLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <CompanyAdminSidebar />
+      <AppSidebar role={companyAdminRoleConfig} menuItems={companyAdminMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">
