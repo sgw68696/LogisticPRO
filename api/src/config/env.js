@@ -16,7 +16,9 @@ const envSchema = Joi.object({
   DB_CONNECTION_LIMIT: Joi.number().integer().min(1).default(10),
 
   JWT_SECRET: Joi.string().min(32).required(),
-  JWT_EXPIRES_IN: Joi.string().default('1d'),
+  JWT_EXPIRES_IN: Joi.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
+  JWT_RESET_EXPIRES_IN: Joi.string().default('15m'),
 
   CORS_ORIGIN: Joi.string().default('*'),
   RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1000).default(900000),
@@ -56,6 +58,8 @@ module.exports = {
   },
   jwt: {
     secret: envVars.JWT_SECRET,
-    expiresIn: envVars.JWT_EXPIRES_IN
+    expiresIn: envVars.JWT_EXPIRES_IN,
+    refreshExpiresIn: envVars.JWT_REFRESH_EXPIRES_IN,
+    resetExpiresIn: envVars.JWT_RESET_EXPIRES_IN
   }
 };
