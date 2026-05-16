@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -8,18 +8,19 @@ import { LoadingState } from '@/components/shared/LoadingState';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { shipmentService } from '@/services/shipment/shipmentService';
 import { formatDate } from '@/lib/shipment-utils/formatting';
-import { SHIPMENT_STATUS_CONFIG } from '@/config/statusConfig';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   Plus, Search, SlidersHorizontal, X,
-  Package, Truck, MapPin, Clock,
-  CheckCircle, AlertCircle, XCircle,
-  Circle, ArrowRight, RotateCcw, Eye, Edit,
+  Package, Truck, Clock,
+  CheckCircle, XCircle,
+  RotateCcw, Eye, Edit,
 } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import type { ConsolidatedShipment, ShipmentStatus, ServiceType } from '@/types/shipment';
+import type { PaginatedResult } from '@/services/shipment/shipmentService';
 
 const STATUSES: ShipmentStatus[] = ['Pending', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Cancelled', 'Failed'];
 const SERVICE_TYPES: ServiceType[] = ['Express', 'Standard', 'Freight'];
@@ -31,42 +32,66 @@ const SERVICE_STYLES: Record<string, string> = {
 };
 
 export default function AllShipmentsPage() {
-  const [shipments, setShipments] = useState<ConsolidatedShipment[]>([]);
+  const [stats, setStats] = useState<Record<string, number> | null>(null);
+  const [pageData, setPageData] = useState<PaginatedResult<ConsolidatedShipment> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatus] = useState<string>('all');
   const [serviceFilter, setService] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handlePageSizeChange = useCallback((newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  }, []);
+
+  const fetchPage = useCallback(async (page: number, query: string, status: string, service: string, size: number) => {
+    setLoading(true);
+    const result = await shipmentService.listPaginated({
+      role: 'SuperAdmin',
+      page,
+      pageSize: size,
+      search: query || undefined,
+      status: status !== 'all' ? status as ShipmentStatus : undefined,
+      serviceType: service !== 'all' ? service as ServiceType : undefined,
+      sortBy: 'createdAt',
+      sortDir: 'desc',
+    });
+    setPageData(result);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    shipmentService.list({ role: 'SuperAdmin' }).then((data) => {
-      setShipments(data);
-      setLoading(false);
+    shipmentService.getStats('SuperAdmin').then((data) => {
+      setStats(data);
+      setStatsLoading(false);
     });
   }, []);
 
-  const kpi = useMemo(() => ({
-    total: shipments.length,
-    inTransit: shipments.filter((s) => s.status === 'In Transit').length,
-    delivered: shipments.filter((s) => s.status === 'Delivered').length,
-    pending: shipments.filter((s) => s.status === 'Pending').length,
-    failed: shipments.filter((s) => ['Cancelled', 'Failed'].includes(s.status)).length,
-  }), [shipments]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, serviceFilter, pageSize]);
 
-  const filtered = useMemo(() => shipments.filter((s) => {
-    const q = search.toLowerCase();
-    const matchQ =
-      s.trackingNumber.toLowerCase().includes(q) ||
-      s.customerName.toLowerCase().includes(q) ||
-      s.sender.name.toLowerCase().includes(q) ||
-      s.receiver.name.toLowerCase().includes(q) ||
-      s.route.origin.toLowerCase().includes(q) ||
-      s.route.destination.toLowerCase().includes(q);
-    const matchStatus = statusFilter === 'all' || s.status === statusFilter;
-    const matchService = serviceFilter === 'all' || s.serviceType === serviceFilter;
-    return matchQ && matchStatus && matchService;
-  }), [shipments, search, statusFilter, serviceFilter]);
+  useEffect(() => {
+    fetchPage(currentPage, debouncedSearch, statusFilter, serviceFilter, pageSize);
+  }, [currentPage, debouncedSearch, statusFilter, serviceFilter, pageSize, fetchPage]);
 
-  const hasFilters = search || statusFilter !== 'all' || serviceFilter !== 'all';
+  const kpi = useMemo(() => {
+    if (!stats) return null;
+    return {
+      total: stats.total ?? 0,
+      inTransit: stats.inTransit ?? 0,
+      delivered: stats.delivered ?? 0,
+      pending: stats.pending ?? 0,
+      failed: (stats.cancelled ?? 0) + (stats.failed ?? 0),
+    };
+  }, [stats]);
+
+  const hasFilters = debouncedSearch || statusFilter !== 'all' || serviceFilter !== 'all';
 
   const clearFilters = () => {
     setSearch(''); setStatus('all'); setService('all');
@@ -78,30 +103,50 @@ export default function AllShipmentsPage() {
       header: 'Tracking',
       sortable: true,
       render: (s) => (
-        <div>
+        <div className="whitespace-nowrap">
           <span className="text-[0.82rem] font-bold font-mono text-primary">{s.trackingNumber}</span>
           <p className="text-[0.68rem] text-muted-foreground/60 mt-0.5">{s.id}</p>
         </div>
       ),
     },
     {
-      key: 'sender',
-      header: 'Sender → Receiver',
+      key: 'customerName',
+      header: 'Customer',
       sortable: true,
       render: (s) => (
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[0.80rem] font-semibold text-foreground truncate max-w-[120px]">{s.sender.name}</span>
-            <ArrowRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-            <span className="text-[0.80rem] font-semibold text-foreground truncate max-w-[120px]">{s.receiver.name}</span>
-          </div>
-          <div className="flex items-center gap-1 mt-0.5">
-            <MapPin className="w-2.5 h-2.5 text-muted-foreground/40 flex-shrink-0" />
-            <span className="text-[0.68rem] text-muted-foreground/60 truncate max-w-[240px]">
-              {s.route.origin} → {s.route.destination}
-            </span>
-          </div>
-        </div>
+        <span className="text-[0.80rem] text-foreground whitespace-nowrap">{s.customerName}</span>
+      ),
+    },
+    {
+      key: 'sender',
+      header: 'Sender',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.sender.name}</span>
+      ),
+    },
+    {
+      key: 'receiver',
+      header: 'Receiver',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.receiver.name}</span>
+      ),
+    },
+    {
+      key: 'route',
+      header: 'Origin',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.route.origin}</span>
+      ),
+    },
+    {
+      key: 'routeDest',
+      header: 'Destination',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.route.destination}</span>
       ),
     },
     {
@@ -109,20 +154,81 @@ export default function AllShipmentsPage() {
       header: 'Service',
       sortable: true,
       render: (s) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[0.70rem] font-bold ${SERVICE_STYLES[s.serviceType] ?? SERVICE_STYLES.Standard}`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[0.70rem] font-bold whitespace-nowrap ${SERVICE_STYLES[s.serviceType] ?? SERVICE_STYLES.Standard}`}>
           {s.serviceType}
         </span>
       ),
     },
     {
-      key: 'package',
+      key: 'transportMode',
+      header: 'Mode',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.route.transportMode}</span>
+      ),
+    },
+    {
+      key: 'distance',
+      header: 'Dist.',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] font-mono text-foreground whitespace-nowrap">{s.route.distance} {s.route.distanceUnit}</span>
+      ),
+    },
+    {
+      key: 'weight',
       header: 'Weight',
       sortable: true,
       render: (s) => (
-        <div>
-          <span className="text-[0.82rem] font-bold font-mono text-foreground">{s.package.weight} kg</span>
-          <p className="text-[0.68rem] text-muted-foreground/60 mt-0.5">{s.package.type}</p>
-        </div>
+        <span className="text-[0.82rem] font-mono text-foreground whitespace-nowrap">{s.package.weight} kg</span>
+      ),
+    },
+    {
+      key: 'pieces',
+      header: 'Pcs',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.80rem] font-mono text-foreground whitespace-nowrap">{s.package.pieces}</span>
+      ),
+    },
+    {
+      key: 'packageType',
+      header: 'Type',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.package.type}</span>
+      ),
+    },
+    {
+      key: 'dimensions',
+      header: 'Dims',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.72rem] font-mono text-muted-foreground whitespace-nowrap">{s.package.dimensions}</span>
+      ),
+    },
+    {
+      key: 'packageValue',
+      header: 'Value',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] font-mono text-foreground whitespace-nowrap">₹{s.package.value.toLocaleString()}</span>
+      ),
+    },
+    {
+      key: 'assignedDriver',
+      header: 'Driver',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-muted-foreground whitespace-nowrap">{s.assignedDriver ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'assignedVehicle',
+      header: 'Vehicle',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-muted-foreground whitespace-nowrap">{s.assignedVehicle ?? '—'}</span>
       ),
     },
     {
@@ -132,21 +238,45 @@ export default function AllShipmentsPage() {
       render: (s) => <StatusBadge status={s.status} />,
     },
     {
+      key: 'onTimeStatus',
+      header: 'On-Time',
+      sortable: true,
+      render: (s) => {
+        if (!s.onTimeStatus) return <span className="text-[0.78rem] text-muted-foreground">—</span>;
+        const colors: Record<string, string> = { 'On Time': 'text-success', Delayed: 'text-destructive', Early: 'text-primary' };
+        return <span className={`text-[0.78rem] font-semibold whitespace-nowrap ${colors[s.onTimeStatus] ?? ''}`}>{s.onTimeStatus}</span>;
+      },
+    },
+    {
+      key: 'createdAt',
+      header: 'Created',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.75rem] text-muted-foreground whitespace-nowrap">{formatDate(s.createdAt)}</span>
+      ),
+    },
+    {
       key: 'estimatedDelivery',
       header: 'Est. Delivery',
       sortable: true,
       render: (s) => {
         const isLate = s.status !== 'Delivered' && s.status !== 'Cancelled' && new Date(s.estimatedDelivery) < new Date();
         return (
-          <div className="flex items-center gap-1.5">
-            <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${isLate ? 'text-destructive' : 'text-muted-foreground/50'}`} />
-            <span className={`text-[0.78rem] ${isLate ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+          <div className="flex items-center gap-1 whitespace-nowrap">
+            <span className={`text-[0.75rem] ${isLate ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
               {formatDate(s.estimatedDelivery)}
-              {isLate && <span className="ml-1 text-[0.65rem]">(Late)</span>}
             </span>
           </div>
         );
       },
+    },
+    {
+      key: 'customsStatus',
+      header: 'Customs',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.customsStatus ?? '—'}</span>
+      ),
     },
     {
       key: 'id',
@@ -164,7 +294,7 @@ export default function AllShipmentsPage() {
     },
   ];
 
-  if (loading) {
+  if (statsLoading && !stats) {
     return (
       <PageWrapper title="All Shipments" description="Platform-wide shipment management across all companies">
         <LoadingState rows={8} message="Loading shipments..." />
@@ -188,11 +318,11 @@ export default function AllShipmentsPage() {
     >
       <div className="grid grid-cols-5 gap-3 mb-6">
         {[
-          { label: 'Total', value: kpi.total, pill: 'bg-primary/10 text-primary border-primary/20', icon: Package },
-          { label: 'In Transit', value: kpi.inTransit, pill: 'bg-primary/10 text-primary border-primary/20', icon: Truck },
-          { label: 'Delivered', value: kpi.delivered, pill: 'bg-success/10 text-success border-success/20', icon: CheckCircle },
-          { label: 'Pending', value: kpi.pending, pill: 'bg-muted/50 text-muted-foreground border-border/40', icon: Clock },
-          { label: 'Failed/Cancel', value: kpi.failed, pill: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle },
+          { label: 'Total', value: kpi?.total ?? 0, pill: 'bg-primary/10 text-primary border-primary/20', icon: Package },
+          { label: 'In Transit', value: kpi?.inTransit ?? 0, pill: 'bg-primary/10 text-primary border-primary/20', icon: Truck },
+          { label: 'Delivered', value: kpi?.delivered ?? 0, pill: 'bg-success/10 text-success border-success/20', icon: CheckCircle },
+          { label: 'Pending', value: kpi?.pending ?? 0, pill: 'bg-muted/50 text-muted-foreground border-border/40', icon: Clock },
+          { label: 'Failed/Cancel', value: kpi?.failed ?? 0, pill: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle },
         ].map(({ label, value, pill, icon: Icon }) => (
           <div key={label} className="bg-card border border-border/60 rounded-xl px-4 py-3.5 shadow-soft flex items-center gap-3">
             <div className={`w-9 h-9 rounded-lg flex-shrink-0 border flex items-center justify-center ${pill}`}>
@@ -270,13 +400,26 @@ export default function AllShipmentsPage() {
               </span>
             )}
             <span className="text-[0.72rem] text-muted-foreground ml-auto">
-              {filtered.length} of {shipments.length} shipment{filtered.length !== 1 ? 's' : ''}
+              {pageData?.total ?? 0} shipment{(pageData?.total ?? 0) !== 1 ? 's' : ''}
             </span>
           </div>
         )}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading || !pageData ? (
+        <DataTable
+          data={[]}
+          columns={columns}
+          pageSize={pageSize}
+          controlledPagination
+          currentPage={1}
+          totalPages={1}
+          totalItems={0}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
+          loading
+        />
+      ) : pageData.items.length === 0 ? (
         <EmptyState
           icon={<Package className="w-8 h-8" />}
           title="No shipments match your filters"
@@ -293,7 +436,19 @@ export default function AllShipmentsPage() {
           }
         />
       ) : (
-        <DataTable data={filtered} columns={columns} emptyMessage="No shipments match your filters" />
+        <DataTable
+          data={pageData.items}
+          columns={columns}
+          emptyMessage="No shipments match your filters"
+          pageSize={pageSize}
+          controlledPagination
+          currentPage={pageData.page}
+          totalPages={pageData.totalPages}
+          totalItems={pageData.total}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
+          loading={loading}
+        />
       )}
     </PageWrapper>
   );

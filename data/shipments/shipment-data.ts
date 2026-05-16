@@ -3,7 +3,7 @@ import { generateConsolidatedShipments } from '../factories/shipment-factory';
 
 export { generateConsolidatedShipments as generateMockShipments } from '../factories/shipment-factory';
 
-export const mockConsolidatedShipments = generateConsolidatedShipments(45);
+export const mockConsolidatedShipments = generateConsolidatedShipments(2500);
 
 export const mockShipmentDashboardStats: ShipmentDashboardStats = {
   totalShipments: mockConsolidatedShipments.length,

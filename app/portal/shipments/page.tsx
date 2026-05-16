@@ -1,64 +1,153 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { PageWrapper } from '@/components/layout/PageWrapper';
+import { DataTable, type Column } from '@/components/shared/DataTable';
 import { KPICard } from '@/components/shared/KPICard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { shipmentService } from '@/services/shipment/shipmentService';
 import { formatDate } from '@/lib/shipment-utils/formatting';
+import { useDebounce } from '@/hooks/use-debounce';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Package, Search, X, Eye, Clock, CheckCircle2,
   Truck, Ship, Plane, ArrowRight, MapPin,
 } from 'lucide-react';
 import type { ConsolidatedShipment } from '@/types/shipment';
-
-const SERVICE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  Express: Plane, Standard: Truck, Freight: Ship,
-};
+import type { PaginatedResult } from '@/services/shipment/shipmentService';
 
 export default function PortalShipmentsPage() {
-  const [shipments, setShipments] = useState<ConsolidatedShipment[]>([]);
+  const [pageData, setPageData] = useState<PaginatedResult<ConsolidatedShipment> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Record<string, number> | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handlePageSizeChange = useCallback((newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  }, []);
+
+  const fetchPage = useCallback(async (page: number, query: string, status: string, size: number) => {
+    setLoading(true);
+    const result = await shipmentService.listPaginated({
+      role: 'CustomerPortal',
+      page,
+      pageSize: size,
+      search: query || undefined,
+      status: status !== 'All' ? status as any : undefined,
+      sortBy: 'createdAt',
+      sortDir: 'desc',
+    });
+    setPageData(result);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    shipmentService.list({ role: 'CustomerPortal' }).then((data) => {
-      setShipments(data);
-      setLoading(false);
+    shipmentService.getStats('CustomerPortal').then((data) => {
+      setStats(data);
+      setStatsLoading(false);
     });
   }, []);
 
-  const statuses = useMemo(() => ['All', ...Array.from(new Set(shipments.map(s => s.status)))], [shipments]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, pageSize]);
 
-  const filtered = useMemo(() => {
-    let r = [...shipments];
-    if (search) {
-      const q = search.toLowerCase();
-      r = r.filter(s =>
-        s.trackingNumber.toLowerCase().includes(q) ||
-        s.route.origin.toLowerCase().includes(q) ||
-        s.route.destination.toLowerCase().includes(q) ||
-        s.receiver.name.toLowerCase().includes(q)
-      );
+  useEffect(() => {
+    fetchPage(currentPage, debouncedSearch, statusFilter, pageSize);
+  }, [currentPage, debouncedSearch, statusFilter, pageSize, fetchPage]);
+
+  const statsData = useMemo(() => ({
+    total: stats?.total ?? 0,
+    inTransit: stats?.inTransit ?? 0,
+    delivered: stats?.delivered ?? 0,
+    pending: stats?.pending ?? 0,
+  }), [stats]);
+
+  const statusPills = useMemo(() => {
+    if (!stats) return [{ label: 'All', count: 0 }];
+    const derived: { label: string; count: number }[] = [{ label: 'All', count: stats.total ?? 0 }];
+    const map: [string, string][] = [
+      ['pending', 'Pending'],
+      ['pickedUp', 'Picked Up'],
+      ['inTransit', 'In Transit'],
+      ['outForDelivery', 'Out for Delivery'],
+      ['delivered', 'Delivered'],
+      ['failed', 'Failed'],
+      ['cancelled', 'Cancelled'],
+    ];
+    for (const [key, label] of map) {
+      const count = (stats as any)[key] ?? 0;
+      if (count > 0) derived.push({ label, count });
     }
-    if (statusFilter !== 'All') r = r.filter(s => s.status === statusFilter);
-    return r.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [shipments, search, statusFilter]);
+    return derived;
+  }, [stats]);
 
-  const stats = useMemo(() => ({
-    total: shipments.length,
-    inTransit: shipments.filter(s => s.status === 'In Transit').length,
-    delivered: shipments.filter(s => s.status === 'Delivered').length,
-    pending: shipments.filter(s => s.status === 'Pending').length,
-  }), [shipments]);
+  const columns: Column<ConsolidatedShipment>[] = [
+    {
+      key: 'trackingNumber',
+      header: 'Tracking ID',
+      render: (s) => (
+        <Link href={`/portal/shipments/${s.id}`} className="font-mono text-xs text-foreground font-semibold hover:text-primary transition-colors">
+          {s.trackingNumber}
+        </Link>
+      ),
+    },
+    {
+      key: 'route',
+      header: 'Route',
+      render: (s) => (
+        <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
+          {s.route.origin}
+          <ArrowRight className="w-2.5 h-2.5 inline" />
+          {s.route.destination}
+        </span>
+      ),
+    },
+    {
+      key: 'serviceType',
+      header: 'Service',
+      render: (s) => (
+        <span className="text-[0.65rem] text-muted-foreground">{s.serviceType}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (s) => <StatusBadge status={s.status} />,
+    },
+    {
+      key: 'estimatedDelivery',
+      header: 'ETA',
+      render: (s) => (
+        <span className="text-[0.7rem] text-muted-foreground">
+          {formatDate(s.estimatedDelivery, { day: '2-digit', month: 'short' } as any)}
+        </span>
+      ),
+    },
+    {
+      key: 'id',
+      header: 'Actions',
+      render: (s) => (
+        <Link href={`/portal/shipments/${s.id}`}>
+          <button className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors">
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+        </Link>
+      ),
+    },
+  ];
 
-  if (loading) {
+  if (statsLoading && !stats) {
     return (
       <PageWrapper title="My Shipments" description="View and track all your shipments in one place">
         <LoadingState rows={6} message="Loading your shipments..." />
@@ -80,10 +169,10 @@ export default function PortalShipmentsPage() {
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <KPICard title="Total Shipments" value={stats.total} icon={<Package className="w-5 h-5" />} iconColor="cyan" />
-        <KPICard title="In Transit" value={stats.inTransit} icon={<Truck className="w-5 h-5" />} iconColor="indigo" />
-        <KPICard title="Delivered" value={stats.delivered} icon={<CheckCircle2 className="w-5 h-5" />} iconColor="green" />
-        <KPICard title="Pending" value={stats.pending} icon={<Clock className="w-5 h-5" />} iconColor="amber" />
+        <KPICard title="Total Shipments" value={statsData.total} icon={<Package className="w-5 h-5" />} iconColor="cyan" />
+        <KPICard title="In Transit" value={statsData.inTransit} icon={<Truck className="w-5 h-5" />} iconColor="indigo" />
+        <KPICard title="Delivered" value={statsData.delivered} icon={<CheckCircle2 className="w-5 h-5" />} iconColor="green" />
+        <KPICard title="Pending" value={statsData.pending} icon={<Clock className="w-5 h-5" />} iconColor="amber" />
       </div>
 
       <div className="bg-card border border-border/60 rounded-xl p-4 mb-6 shadow-soft">
@@ -104,31 +193,43 @@ export default function PortalShipmentsPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {statuses.map((st) => {
-            const isActive = statusFilter === st;
-            const count = st === 'All' ? shipments.length : shipments.filter(s => s.status === st).length;
+          {statusPills.map(({ label, count }) => {
+            const isActive = statusFilter === label;
             return (
               <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
+                key={label}
+                onClick={() => setStatusFilter(label)}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.65rem] font-bold border transition-all ${
                   isActive
                     ? 'bg-primary/10 text-primary border-primary/30 shadow-sm'
                     : 'bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground'
                 }`}
               >
-                {st === 'All' ? null : <StatusBadge status={st} dot />}
-                {st} <span className="text-[0.6rem] opacity-60">({count})</span>
+                {label === 'All' ? null : <StatusBadge status={label} dot />}
+                {label} <span className="text-[0.6rem] opacity-60">({count})</span>
               </button>
             );
           })}
         </div>
-        {(search || statusFilter !== 'All') && (
-          <p className="text-[0.65rem] text-muted-foreground mt-2 ml-1">{filtered.length} shipment(s) found</p>
+        {(debouncedSearch || statusFilter !== 'All') && (
+          <p className="text-[0.65rem] text-muted-foreground mt-2 ml-1">{pageData?.total ?? 0} shipment(s) found</p>
         )}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading || !pageData ? (
+        <DataTable
+          data={[]}
+          columns={columns}
+          pageSize={pageSize}
+          controlledPagination
+          currentPage={1}
+          totalPages={1}
+          totalItems={0}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
+          loading
+        />
+      ) : pageData.items.length === 0 ? (
         <EmptyState
           icon={<Package className="w-8 h-8" />}
           title="No shipments found"
@@ -140,62 +241,19 @@ export default function PortalShipmentsPage() {
           }
         />
       ) : (
-        <div className="bg-card border border-border/60 rounded-xl shadow-soft overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50 bg-muted/10">
-                  <th className="text-left py-3 px-4 text-muted-foreground font-medium text-[0.65rem] uppercase tracking-wider">Tracking ID</th>
-                  <th className="text-left py-3 px-4 text-muted-foreground font-medium text-[0.65rem] uppercase tracking-wider">Route</th>
-                  <th className="text-left py-3 px-4 text-muted-foreground font-medium text-[0.65rem] uppercase tracking-wider">Service</th>
-                  <th className="text-left py-3 px-4 text-muted-foreground font-medium text-[0.65rem] uppercase tracking-wider">Status</th>
-                  <th className="text-right py-3 px-4 text-muted-foreground font-medium text-[0.65rem] uppercase tracking-wider">ETA</th>
-                  <th className="text-right py-3 px-4 text-muted-foreground font-medium text-[0.65rem] uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((s, i) => {
-                  const ServiceIcon = SERVICE_ICONS[s.serviceType] || Truck;
-                  return (
-                    <tr key={s.id} className={`border-b border-border/20 hover:bg-muted/10 transition-colors ${i === filtered.length - 1 ? 'border-b-0' : ''}`}>
-                      <td className="py-3 px-4">
-                        <Link href={`/portal/shipments/${s.id}`} className="font-mono text-xs text-foreground font-semibold hover:text-primary transition-colors">
-                          {s.trackingNumber}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-4 max-w-[200px]">
-                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                          {s.route.origin}
-                          <ArrowRight className="w-2.5 h-2.5 inline" />
-                          {s.route.destination}
-                        </p>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <ServiceIcon className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-[0.65rem] text-muted-foreground">{s.serviceType}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge status={s.status} />
-                      </td>
-                      <td className="py-3 px-4 text-right text-[0.7rem] text-muted-foreground">
-                        {formatDate(s.estimatedDelivery, { day: '2-digit', month: 'short' })}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <Link href={`/portal/shipments/${s.id}`}>
-                          <button className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors">
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          data={pageData.items}
+          columns={columns}
+          emptyMessage="No shipments match your filters"
+          pageSize={pageSize}
+          controlledPagination
+          currentPage={pageData.page}
+          totalPages={pageData.totalPages}
+          totalItems={pageData.total}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
+          loading={loading}
+        />
       )}
     </PageWrapper>
   );

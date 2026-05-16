@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -9,6 +9,7 @@ import { LoadingState } from '@/components/shared/LoadingState';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { shipmentService } from '@/services/shipment/shipmentService';
 import { formatDate } from '@/lib/shipment-utils/formatting';
+import { useDebounce } from '@/hooks/use-debounce';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import {
   Package, Search, Ship, Truck, Plane, Filter, X,
 } from 'lucide-react';
 import type { ConsolidatedShipment } from '@/types/shipment';
+import type { PaginatedResult } from '@/services/shipment/shipmentService';
 
 const getModeIcon = (mode: string) => {
   switch (mode) {
@@ -35,42 +37,68 @@ const getMode = (transportMode: string) => {
 };
 
 export default function CompanyShipmentsPage() {
-  const [shipments, setShipments] = useState<ConsolidatedShipment[]>([]);
+  const [pageData, setPageData] = useState<PaginatedResult<ConsolidatedShipment> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Record<string, number> | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [stage, setStage] = useState('Show All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handlePageSizeChange = useCallback((newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  }, []);
+
+  const statusFromStage = (s: string): string | undefined => {
+    switch (s) {
+      case 'Show All': return undefined;
+      case 'Pending': return 'Pending';
+      case 'Booked': return 'Picked Up';
+      case 'Sailing': return undefined; // handled via status list
+      case 'Arrived': return 'Delivered';
+      default: return undefined;
+    }
+  };
+
+  const fetchPage = useCallback(async (page: number, query: string, stg: string, size: number) => {
+    setLoading(true);
+    const result = await shipmentService.listPaginated({
+      role: 'CompanyAdmin',
+      page,
+      pageSize: size,
+      search: query || undefined,
+      status: statusFromStage(stg) as any,
+      sortBy: 'createdAt',
+      sortDir: 'desc',
+    });
+    setPageData(result);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    shipmentService.list({ role: 'CompanyAdmin' }).then((data) => {
-      setShipments(data);
-      setLoading(false);
+    shipmentService.getStats('CompanyAdmin').then((data) => {
+      setStats(data);
+      setStatsLoading(false);
     });
   }, []);
 
-  const filtered = useMemo(() => {
-    return shipments.filter((s) => {
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        s.trackingNumber.toLowerCase().includes(q) ||
-        s.customerName.toLowerCase().includes(q) ||
-        s.route.origin.toLowerCase().includes(q) ||
-        s.route.destination.toLowerCase().includes(q);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, stage, pageSize]);
 
-      const matchesStage =
-        stage === 'Show All' ||
-        s.status === stage ||
-        (stage === 'Sailing' && ['In Transit', 'Picked Up'].includes(s.status)) ||
-        (stage === 'Arrived' && s.status === 'Delivered');
+  useEffect(() => {
+    fetchPage(currentPage, debouncedSearch, stage, pageSize);
+  }, [currentPage, debouncedSearch, stage, pageSize, fetchPage]);
 
-      return matchesSearch && matchesStage;
-    });
-  }, [shipments, search, stage]);
-
-  const activeShipments = shipments.filter((s) => !['Delivered', 'Cancelled', 'Failed'].includes(s.status)).length;
-  const inTransit = shipments.filter((s) => ['In Transit', 'Picked Up'].includes(s.status)).length;
-  const delayed = shipments.filter((s) => ['Failed', 'Cancelled'].includes(s.status)).length;
-  const delivered = shipments.filter((s) => s.status === 'Delivered').length;
+  const activeShipments = stats ? (stats.total ?? 0) - ((stats.delivered ?? 0) + (stats.cancelled ?? 0) + (stats.failed ?? 0)) : 0;
+  const inTransit = stats ? (stats.inTransit ?? 0) + (stats.outForDelivery ?? 0) : 0;
+  const delayed = stats ? (stats.failed ?? 0) + (stats.cancelled ?? 0) : 0;
+  const delivered = stats?.delivered ?? 0;
+  const totalCount = stats?.total ?? 0;
 
   const columns: Column<ConsolidatedShipment>[] = [
     {
@@ -126,14 +154,14 @@ export default function CompanyShipmentsPage() {
   ];
 
   const stageTabs = [
-    { label: 'Show All', count: shipments.length },
-    { label: 'Pending', count: shipments.filter((s) => s.status === 'Pending').length },
-    { label: 'Booked', count: shipments.filter((s) => s.status === 'Picked Up').length },
-    { label: 'Sailing', count: shipments.filter((s) => ['In Transit', 'Picked Up'].includes(s.status)).length },
-    { label: 'Arrived', count: shipments.filter((s) => s.status === 'Delivered').length },
+    { label: 'Show All', count: totalCount },
+    { label: 'Pending', count: stats?.pending ?? 0 },
+    { label: 'Booked', count: stats?.pickedUp ?? 0 },
+    { label: 'Sailing', count: inTransit },
+    { label: 'Arrived', count: delivered },
   ];
 
-  if (loading) {
+  if (statsLoading && !stats) {
     return (
       <PageWrapper title="Shipments">
         <LoadingState rows={8} message="Loading shipments..." />
@@ -191,7 +219,7 @@ export default function CompanyShipmentsPage() {
           </CardHeader>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {filtered.slice(0, 3).map((s) => {
+              {(pageData?.items ?? []).slice(0, 3).map((s) => {
                 const mode = getMode(s.route.transportMode);
                 return (
                   <div key={s.id} className="rounded-xl border border-border/60 bg-muted/20 p-4">
@@ -253,7 +281,24 @@ export default function CompanyShipmentsPage() {
         </Card>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading || !pageData ? (
+        <Card className="border-border/60 bg-card shadow-soft">
+          <CardContent className="pt-6">
+            <DataTable
+              data={[]}
+              columns={columns}
+              pageSize={pageSize}
+              controlledPagination
+              currentPage={1}
+              totalPages={1}
+              totalItems={0}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={handlePageSizeChange}
+              loading
+            />
+          </CardContent>
+        </Card>
+      ) : pageData.items.length === 0 ? (
         <Card className="border-border/60 bg-card shadow-soft">
           <CardContent>
             <EmptyState
@@ -274,11 +319,16 @@ export default function CompanyShipmentsPage() {
           </CardHeader>
           <CardContent className="pt-6">
             <DataTable
-              data={filtered}
+              data={pageData.items}
               columns={columns}
-              pageSize={10}
-              searchKey="trackingNumber"
-              searchPlaceholder="Search shipments..."
+              pageSize={pageSize}
+              controlledPagination
+              currentPage={pageData.page}
+              totalPages={pageData.totalPages}
+              totalItems={pageData.total}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={handlePageSizeChange}
+              loading={loading}
             />
           </CardContent>
         </Card>
