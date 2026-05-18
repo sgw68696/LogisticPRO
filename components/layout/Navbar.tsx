@@ -101,31 +101,16 @@ export function Navbar() {
 
         {/* ── Breadcrumb ── */}
         <nav className="flex items-center gap-0 text-[0.85rem]">
-          <Link
-            href="/dashboard"
-            className="
-              text-muted-foreground font-medium no-underline
-              hover:text-primary transition-colors duration-200
-            "
-          >
-            Home
-          </Link>
-
+          <span className="text-muted-foreground font-medium select-none">Home</span>
           {breadcrumbs.map((crumb) => (
             <span key={crumb.href} className="flex items-center">
               <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-muted-foreground/40" />
               {crumb.isLast ? (
                 <span className="nb-crumb-active">{crumb.label}</span>
               ) : (
-                <Link
-                  href={crumb.href}
-                  className="
-                    text-muted-foreground font-medium no-underline
-                    hover:text-primary transition-colors duration-200
-                  "
-                >
+                <span className="text-muted-foreground font-medium select-none">
                   {crumb.label}
-                </Link>
+                </span>
               )}
             </span>
           ))}
