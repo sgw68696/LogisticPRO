@@ -10,6 +10,7 @@ const config = require('./config/env');
 const requestLogger = require('./middlewares/requestLogger.middleware');
 const rateLimiter = require('./middlewares/rateLimiter.middleware');
 const sanitizeRequest = require('./middlewares/sanitize.middleware');
+const responseHandler = require('./middlewares/response.middleware');
 
 const routes = require('./routes');
 
@@ -35,6 +36,7 @@ app.use(hpp());
 app.use(sanitizeRequest);
 app.use(requestLogger);
 app.use(rateLimiter);
+app.use(responseHandler);
 
 app.use(config.apiBasePath, routes);
 

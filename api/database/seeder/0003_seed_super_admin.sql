@@ -11,7 +11,8 @@ INSERT INTO `users` (
   `username`,
   `password`,
   `email_verified_at`,
-  `status`
+  `status`,
+  `approval_status`
 ) VALUES (
   UUID(),
   NULL,
@@ -20,9 +21,10 @@ INSERT INTO `users` (
   'Admin',
   'admin@logisticpro.com',
   'superadmin',
-  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RK.s5u2D', -- Admin@123
+  '$2a$12$GhXwlpZTEyy9x8ED.vDJa.yg11rnQ2hjnfnCaeVqI1lKychJHaThW',
   CURRENT_TIMESTAMP,
-  'active'
+  'active',
+  'approved'
 );
 
 //Username: superadmin

@@ -19,6 +19,8 @@ const signAccessToken = (user) => {
       email: user.email,
       role: user.role_slug || user.role,
       company_id: user.company_id || null,
+      organization_id: user.organization_id || null,
+      approval_status: user.approval_status || 'approved',
       type: 'access'
     },
     config.jwt.expiresIn

@@ -3,8 +3,13 @@ const logger = require('../config/logger');
 const { error: errorResponse } = require('../utils/response');
 
 const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.isOperational ? err.message : 'Internal server error';
+  let statusCode = err.statusCode || 500;
+  let message = err.isOperational ? err.message : 'Internal server error';
+
+  if (err.name === 'ValidationError' && err.details) {
+    statusCode = 400;
+    message = err.details[0]?.message || err.message;
+  }
 
   const logData = {
     message: err.message,

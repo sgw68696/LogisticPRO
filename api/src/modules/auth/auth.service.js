@@ -24,12 +24,20 @@ const login = async ({ email, password }, ip) => {
     throw new ApiError(401, 'Account is inactive or suspended. Contact support');
   }
 
+  if (user.approval_status && user.approval_status !== 'approved' && user.role_slug !== 'superadmin') {
+    throw new ApiError(403, `Account is pending approval. Current status: ${user.approval_status}`);
+  }
+
   if (user.company_id && user.company_status && user.company_status !== 'active') {
     throw new ApiError(403, 'Company account is not active. Contact support');
   }
 
   if (user.company_id && user.subscription_status === 'suspended') {
     throw new ApiError(403, 'Company subscription is suspended. Contact support');
+  }
+
+  if (user.organization_id && user.organization_status && user.organization_status !== 'active') {
+    throw new ApiError(403, 'Organization account is not active. Contact support');
   }
 
   const isPasswordValid = await authUtils.comparePassword(password, user.password);
@@ -69,6 +77,10 @@ const login = async ({ email, password }, ip) => {
       companyId: user.company_id,
       companyUuid: user.company_uuid,
       companyName: user.company_name,
+      organizationId: user.organization_id,
+      organizationUuid: user.organization_uuid,
+      organizationName: user.organization_name,
+      approvalStatus: user.approval_status,
       permissions: permissions.map(p => p.slug)
     },
     ...tokenPair
