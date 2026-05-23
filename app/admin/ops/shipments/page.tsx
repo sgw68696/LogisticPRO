@@ -1,123 +1,152 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { DataTable, type Column } from '@/components/shared/DataTable';
-import { mockShipments, mockCompanies } from '@/data/mockData';
-import type { Shipment, ShipmentStatus } from '@/data/mockData';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { shipmentService } from '@/services/shipment/shipmentService';
+import { formatDate } from '@/lib/shipment-utils/formatting';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   Plus, Search, SlidersHorizontal, X,
-  Package, Truck, MapPin, Clock,
-  CheckCircle, AlertCircle, XCircle,
-  Circle, ArrowRight, RotateCcw, Eye, Edit,
+  Package, Truck, Clock,
+  CheckCircle, XCircle,
+  RotateCcw, Eye, Edit,
 } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { formatDate } from '@/lib/utils';
+import type { ConsolidatedShipment, ShipmentStatus, ServiceType } from '@/types/shipment';
+import type { PaginatedResult } from '@/services/shipment/shipmentService';
 
-// ── Status config ──
-const STATUS_META: Record<ShipmentStatus, {
-  pill: string; dot: string; icon: typeof Circle;
-}> = {
-  'Pending':          { pill: 'bg-muted/50 text-muted-foreground border-border/40',       dot: 'bg-muted-foreground', icon: Circle       },
-  'Picked Up':        { pill: 'bg-sky-500/10 text-sky-400 border-sky-500/20',             dot: 'bg-sky-400',          icon: Package      },
-  'In Transit':       { pill: 'bg-primary/10 text-primary border-primary/20',             dot: 'bg-primary',          icon: Truck        },
-  'Out for Delivery': { pill: 'bg-amber-500/10 text-amber-400 border-amber-500/20',       dot: 'bg-amber-400',        icon: MapPin       },
-  'Delivered':        { pill: 'bg-success/10 text-success border-success/20',             dot: 'bg-success',          icon: CheckCircle  },
-  'Cancelled':        { pill: 'bg-destructive/10 text-destructive border-destructive/20', dot: 'bg-destructive',      icon: XCircle      },
-  'Failed':           { pill: 'bg-destructive/10 text-destructive border-destructive/20', dot: 'bg-destructive',      icon: AlertCircle  },
-};
+const STATUSES: ShipmentStatus[] = ['Pending', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Cancelled', 'Failed'];
+const SERVICE_TYPES: ServiceType[] = ['Express', 'Standard', 'Freight'];
 
 const SERVICE_STYLES: Record<string, string> = {
-  Express:  'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+  Express: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
   Standard: 'bg-muted/40 text-muted-foreground border border-border/40',
-  Freight:  'bg-violet-500/10 text-violet-400 border border-violet-500/20',
+  Freight: 'bg-violet-500/10 text-violet-400 border border-violet-500/20',
 };
 
-const STATUSES: ShipmentStatus[] = [
-  'Pending', 'Picked Up', 'In Transit',
-  'Out for Delivery', 'Delivered', 'Cancelled', 'Failed',
-];
-
-const SERVICE_TYPES = ['Express', 'Standard', 'Freight'];
-
 export default function AllShipmentsPage() {
-  const [search, setSearch]         = useState('');
-  const [statusFilter, setStatus]   = useState<ShipmentStatus | 'all'>('all');
-  const [serviceFilter, setService] = useState<string | 'all'>('all');
-  const [companyFilter, setCompany] = useState<string | 'all'>('all');
+  const [stats, setStats] = useState<Record<string, number> | null>(null);
+  const [pageData, setPageData] = useState<PaginatedResult<ConsolidatedShipment> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  // ── KPI counts (always from full dataset) ──
-  const kpi = useMemo(() => ({
-    total:       mockShipments.length,
-    inTransit:   mockShipments.filter((s) => s.status === 'In Transit').length,
-    delivered:   mockShipments.filter((s) => s.status === 'Delivered').length,
-    pending:     mockShipments.filter((s) => s.status === 'Pending').length,
-    failed:      mockShipments.filter((s) => ['Cancelled', 'Failed'].includes(s.status)).length,
-  }), []);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
+  const [statusFilter, setStatus] = useState<string>('all');
+  const [serviceFilter, setService] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // ── Filtered rows ──
-  const filtered = useMemo(() => mockShipments.filter((s) => {
-    const q = search.toLowerCase();
-    const matchQ =
-      s.trackingNumber.toLowerCase().includes(q) ||
-      s.senderName.toLowerCase().includes(q)     ||
-      s.receiverName.toLowerCase().includes(q)   ||
-      s.pickupAddress.toLowerCase().includes(q)  ||
-      s.deliveryAddress.toLowerCase().includes(q);
-    const matchStatus  = statusFilter  === 'all' || s.status      === statusFilter;
-    const matchService = serviceFilter === 'all' || s.serviceType === serviceFilter;
-    // company filter: mock shipments don't have companyId, so skip unless extended
-    return matchQ && matchStatus && matchService;
-  }), [search, statusFilter, serviceFilter]);
+  const handlePageSizeChange = useCallback((newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  }, []);
 
-  const hasFilters = search || statusFilter !== 'all' || serviceFilter !== 'all' || companyFilter !== 'all';
+  const fetchPage = useCallback(async (page: number, query: string, status: string, service: string, size: number) => {
+    setLoading(true);
+    const result = await shipmentService.listPaginated({
+      role: 'SuperAdmin',
+      page,
+      pageSize: size,
+      search: query || undefined,
+      status: status !== 'all' ? status as ShipmentStatus : undefined,
+      serviceType: service !== 'all' ? service as ServiceType : undefined,
+      sortBy: 'createdAt',
+      sortDir: 'desc',
+    });
+    setPageData(result);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    shipmentService.getStats('SuperAdmin').then((data) => {
+      setStats(data);
+      setStatsLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, serviceFilter, pageSize]);
+
+  useEffect(() => {
+    fetchPage(currentPage, debouncedSearch, statusFilter, serviceFilter, pageSize);
+  }, [currentPage, debouncedSearch, statusFilter, serviceFilter, pageSize, fetchPage]);
+
+  const kpi = useMemo(() => {
+    if (!stats) return null;
+    return {
+      total: stats.total ?? 0,
+      inTransit: stats.inTransit ?? 0,
+      delivered: stats.delivered ?? 0,
+      pending: stats.pending ?? 0,
+      failed: (stats.cancelled ?? 0) + (stats.failed ?? 0),
+    };
+  }, [stats]);
+
+  const hasFilters = debouncedSearch || statusFilter !== 'all' || serviceFilter !== 'all';
 
   const clearFilters = () => {
-    setSearch(''); setStatus('all'); setService('all'); setCompany('all');
+    setSearch(''); setStatus('all'); setService('all');
   };
 
-  // ── Table columns ──
-  const columns: Column<Shipment>[] = [
+  const columns: Column<ConsolidatedShipment>[] = [
     {
       key: 'trackingNumber',
       header: 'Tracking',
       sortable: true,
       render: (s) => (
-        <div>
-          <span className="text-[0.82rem] font-bold font-mono text-primary">
-            {s.trackingNumber}
-          </span>
-          <p className="text-[0.68rem] text-muted-foreground/60 mt-0.5">
-            {s.id}
-          </p>
+        <div className="whitespace-nowrap">
+          <span className="text-[0.82rem] font-bold font-mono text-primary">{s.trackingNumber}</span>
+          <p className="text-[0.68rem] text-muted-foreground/60 mt-0.5">{s.id}</p>
         </div>
       ),
     },
     {
-      key: 'senderName',
-      header: 'Sender → Receiver',
+      key: 'customerName',
+      header: 'Customer',
       sortable: true,
       render: (s) => (
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[0.80rem] font-semibold text-foreground truncate max-w-[120px]">
-              {s.senderName}
-            </span>
-            <ArrowRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-            <span className="text-[0.80rem] font-semibold text-foreground truncate max-w-[120px]">
-              {s.receiverName}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 mt-0.5">
-            <MapPin className="w-2.5 h-2.5 text-muted-foreground/40 flex-shrink-0" />
-            <span className="text-[0.68rem] text-muted-foreground/60 truncate max-w-[240px]">
-              {s.pickupAddress} → {s.deliveryAddress}
-            </span>
-          </div>
-        </div>
+        <span className="text-[0.80rem] text-foreground whitespace-nowrap">{s.customerName}</span>
+      ),
+    },
+    {
+      key: 'sender',
+      header: 'Sender',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.sender.name}</span>
+      ),
+    },
+    {
+      key: 'receiver',
+      header: 'Receiver',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.receiver.name}</span>
+      ),
+    },
+    {
+      key: 'route',
+      header: 'Origin',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.route.origin}</span>
+      ),
+    },
+    {
+      key: 'routeDest',
+      header: 'Destination',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.route.destination}</span>
       ),
     },
     {
@@ -125,87 +154,139 @@ export default function AllShipmentsPage() {
       header: 'Service',
       sortable: true,
       render: (s) => (
-        <span className={`
-          inline-flex items-center px-2.5 py-0.5
-          rounded-md text-[0.70rem] font-bold
-          ${SERVICE_STYLES[s.serviceType] ?? SERVICE_STYLES.Standard}
-        `}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[0.70rem] font-bold whitespace-nowrap ${SERVICE_STYLES[s.serviceType] ?? SERVICE_STYLES.Standard}`}>
           {s.serviceType}
         </span>
       ),
     },
     {
-      key: 'packageWeight',
+      key: 'transportMode',
+      header: 'Mode',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.route.transportMode}</span>
+      ),
+    },
+    {
+      key: 'distance',
+      header: 'Dist.',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] font-mono text-foreground whitespace-nowrap">{s.route.distance} {s.route.distanceUnit}</span>
+      ),
+    },
+    {
+      key: 'weight',
       header: 'Weight',
       sortable: true,
       render: (s) => (
-        <div>
-          <span className="text-[0.82rem] font-bold font-mono text-foreground">
-            {s.packageWeight} kg
-          </span>
-          <p className="text-[0.68rem] text-muted-foreground/60 mt-0.5">
-            {s.packageType}
-          </p>
-        </div>
+        <span className="text-[0.82rem] font-mono text-foreground whitespace-nowrap">{s.package.weight} kg</span>
+      ),
+    },
+    {
+      key: 'pieces',
+      header: 'Pcs',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.80rem] font-mono text-foreground whitespace-nowrap">{s.package.pieces}</span>
+      ),
+    },
+    {
+      key: 'packageType',
+      header: 'Type',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.package.type}</span>
+      ),
+    },
+    {
+      key: 'dimensions',
+      header: 'Dims',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.72rem] font-mono text-muted-foreground whitespace-nowrap">{s.package.dimensions}</span>
+      ),
+    },
+    {
+      key: 'packageValue',
+      header: 'Value',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] font-mono text-foreground whitespace-nowrap">₹{s.package.value.toLocaleString()}</span>
+      ),
+    },
+    {
+      key: 'assignedDriver',
+      header: 'Driver',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-muted-foreground whitespace-nowrap">{s.assignedDriver ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'assignedVehicle',
+      header: 'Vehicle',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-muted-foreground whitespace-nowrap">{s.assignedVehicle ?? '—'}</span>
       ),
     },
     {
       key: 'status',
       header: 'Status',
       sortable: true,
+      render: (s) => <StatusBadge status={s.status} />,
+    },
+    {
+      key: 'onTimeStatus',
+      header: 'On-Time',
+      sortable: true,
       render: (s) => {
-        const meta = STATUS_META[s.status];
-        const StatusIcon = meta.icon;
-        return (
-          <span className={`
-            inline-flex items-center gap-1.5
-            px-2.5 py-0.5 rounded-full
-            text-[0.70rem] font-bold border
-            ${meta.pill}
-          `}>
-            <StatusIcon className="w-3 h-3" />
-            {s.status}
-          </span>
-        );
+        if (!s.onTimeStatus) return <span className="text-[0.78rem] text-muted-foreground">—</span>;
+        const colors: Record<string, string> = { 'On Time': 'text-success', Delayed: 'text-destructive', Early: 'text-primary' };
+        return <span className={`text-[0.78rem] font-semibold whitespace-nowrap ${colors[s.onTimeStatus] ?? ''}`}>{s.onTimeStatus}</span>;
       },
+    },
+    {
+      key: 'createdAt',
+      header: 'Created',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.75rem] text-muted-foreground whitespace-nowrap">{formatDate(s.createdAt)}</span>
+      ),
     },
     {
       key: 'estimatedDelivery',
       header: 'Est. Delivery',
       sortable: true,
       render: (s) => {
-        const isLate =
-          s.status !== 'Delivered' &&
-          s.status !== 'Cancelled' &&
-          new Date(s.estimatedDelivery) < new Date();
+        const isLate = s.status !== 'Delivered' && s.status !== 'Cancelled' && new Date(s.estimatedDelivery) < new Date();
         return (
-          <div className="flex items-center gap-1.5">
-            <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${isLate ? 'text-destructive' : 'text-muted-foreground/50'}`} />
-            <span className={`text-[0.78rem] ${isLate ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+          <div className="flex items-center gap-1 whitespace-nowrap">
+            <span className={`text-[0.75rem] ${isLate ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
               {formatDate(s.estimatedDelivery)}
-              {isLate && <span className="ml-1 text-[0.65rem]">(Late)</span>}
             </span>
           </div>
         );
       },
     },
     {
+      key: 'customsStatus',
+      header: 'Customs',
+      sortable: true,
+      render: (s) => (
+        <span className="text-[0.78rem] text-foreground whitespace-nowrap">{s.customsStatus ?? '—'}</span>
+      ),
+    },
+    {
       key: 'id',
       header: 'Actions',
-      render: (s) => (
+      render: () => (
         <div className="flex items-center gap-1 justify-end">
-          <button className="
-            w-8 h-8 flex items-center justify-center rounded-lg
-            text-muted-foreground hover:bg-primary/10 hover:text-primary
-            transition-colors duration-150
-          ">
+          <button className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors duration-150">
             <Eye className="w-3.5 h-3.5" />
           </button>
-          <button className="
-            w-8 h-8 flex items-center justify-center rounded-lg
-            text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400
-            transition-colors duration-150
-          ">
+          <button className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400 transition-colors duration-150">
             <Edit className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -213,18 +294,21 @@ export default function AllShipmentsPage() {
     },
   ];
 
+  if (statsLoading && !stats) {
+    return (
+      <PageWrapper title="All Shipments" description="Platform-wide shipment management across all companies">
+        <LoadingState rows={8} message="Loading shipments..." />
+      </PageWrapper>
+    );
+  }
+
   return (
     <PageWrapper
       title="All Shipments"
       description="Platform-wide shipment management across all companies"
       actions={
         <button
-          className="
-            flex items-center gap-2 px-3.5 py-2 rounded-[10px]
-            text-[0.82rem] font-bold text-white font-display cursor-pointer
-            transition-all duration-200 hover:-translate-y-px
-            hover:shadow-[0_6px_20px_oklch(var(--primary)/0.35)]
-          "
+          className="flex items-center gap-2 px-3.5 py-2 rounded-[10px] text-[0.82rem] font-bold text-white font-display cursor-pointer transition-all duration-200 hover:-translate-y-px hover:shadow-[0_6px_20px_oklch(var(--primary)/0.35)]"
           style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)' }}
         >
           <Plus size={14} />
@@ -232,68 +316,41 @@ export default function AllShipmentsPage() {
         </button>
       }
     >
-
-      {/* ── KPI Strip ── */}
       <div className="grid grid-cols-5 gap-3 mb-6">
         {[
-          { label: 'Total',        value: kpi.total,     pill: 'bg-primary/10 text-primary border-primary/20',             icon: Package   },
-          { label: 'In Transit',   value: kpi.inTransit, pill: 'bg-primary/10 text-primary border-primary/20',             icon: Truck     },
-          { label: 'Delivered',    value: kpi.delivered, pill: 'bg-success/10 text-success border-success/20',             icon: CheckCircle },
-          { label: 'Pending',      value: kpi.pending,   pill: 'bg-muted/50 text-muted-foreground border-border/40',       icon: Clock     },
-          { label: 'Failed/Cancel',value: kpi.failed,    pill: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle   },
+          { label: 'Total', value: kpi?.total ?? 0, pill: 'bg-primary/10 text-primary border-primary/20', icon: Package },
+          { label: 'In Transit', value: kpi?.inTransit ?? 0, pill: 'bg-primary/10 text-primary border-primary/20', icon: Truck },
+          { label: 'Delivered', value: kpi?.delivered ?? 0, pill: 'bg-success/10 text-success border-success/20', icon: CheckCircle },
+          { label: 'Pending', value: kpi?.pending ?? 0, pill: 'bg-muted/50 text-muted-foreground border-border/40', icon: Clock },
+          { label: 'Failed/Cancel', value: kpi?.failed ?? 0, pill: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle },
         ].map(({ label, value, pill, icon: Icon }) => (
-          <div key={label} className="
-            bg-card border border-border/60 rounded-xl
-            px-4 py-3.5 shadow-soft
-            flex items-center gap-3
-          ">
-            <div className={`
-              w-9 h-9 rounded-lg flex-shrink-0 border
-              flex items-center justify-center
-              ${pill}
-            `}>
+          <div key={label} className="bg-card border border-border/60 rounded-xl px-4 py-3.5 shadow-soft flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-lg flex-shrink-0 border flex items-center justify-center ${pill}`}>
               <Icon className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[0.68rem] font-bold text-muted-foreground uppercase tracking-wide">
-                {label}
-              </p>
-              <p className="text-[1.3rem] font-black font-display text-foreground leading-tight">
-                {value}
-              </p>
+              <p className="text-[0.68rem] font-bold text-muted-foreground uppercase tracking-wide">{label}</p>
+              <p className="text-[1.3rem] font-black font-display text-foreground leading-tight">{value}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── Filter Bar ── */}
       <div className="bg-card border border-border/60 rounded-xl p-4 mb-6 shadow-soft">
         <div className="flex flex-col sm:flex-row gap-3">
-
-          {/* Search */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <input
               type="text"
-              placeholder="Search tracking #, sender, receiver or address..."
+              placeholder="Search tracking #, customer, sender, receiver or route..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="
-                nb-search w-full h-9 pl-9 pr-3
-                bg-muted/40 border border-border rounded-[9px]
-                text-[0.84rem] text-foreground outline-none
-                placeholder:text-muted-foreground
-                focus:border-primary/50 focus:bg-primary/5
-                focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.1)]
-              "
+              className="nb-search w-full h-9 pl-9 pr-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-primary/5 focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.1)]"
             />
           </div>
-
           <div className="flex items-center gap-2 flex-wrap">
             <SlidersHorizontal size={13} className="text-muted-foreground shrink-0" />
-
-            {/* Status filter */}
-            <Select value={statusFilter} onValueChange={(v) => setStatus(v as typeof statusFilter)}>
+            <Select value={statusFilter} onValueChange={(v) => setStatus(v)}>
               <SelectTrigger className="w-[160px] h-9 text-[0.82rem] bg-muted/40 border-border/60 rounded-[9px] focus:ring-0">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
@@ -304,9 +361,7 @@ export default function AllShipmentsPage() {
                 ))}
               </SelectContent>
             </Select>
-
-            {/* Service type filter */}
-            <Select value={serviceFilter} onValueChange={(v) => setService(v as typeof serviceFilter)}>
+            <Select value={serviceFilter} onValueChange={(v) => setService(v)}>
               <SelectTrigger className="w-[140px] h-9 text-[0.82rem] bg-muted/40 border-border/60 rounded-[9px] focus:ring-0">
                 <SelectValue placeholder="All Services" />
               </SelectTrigger>
@@ -317,30 +372,10 @@ export default function AllShipmentsPage() {
                 ))}
               </SelectContent>
             </Select>
-
-            {/* Company filter */}
-            <Select value={companyFilter} onValueChange={setCompany}>
-              <SelectTrigger className="w-[160px] h-9 text-[0.82rem] bg-muted/40 border-border/60 rounded-[9px] focus:ring-0">
-                <SelectValue placeholder="All Companies" />
-              </SelectTrigger>
-              <SelectContent className="nb-dropdown">
-                <SelectItem value="all" className="text-[0.82rem]">All Companies</SelectItem>
-                {mockCompanies.map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="text-[0.82rem]">{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Clear all filters */}
             {hasFilters && (
               <button
                 onClick={clearFilters}
-                className="
-                  flex items-center gap-1.5 px-2.5 h-9
-                  bg-destructive/10 border border-destructive/20
-                  rounded-[9px] text-[0.78rem] font-semibold text-destructive
-                  hover:bg-destructive/20 transition-colors duration-150
-                "
+                className="flex items-center gap-1.5 px-2.5 h-9 bg-destructive/10 border border-destructive/20 rounded-[9px] text-[0.78rem] font-semibold text-destructive hover:bg-destructive/20 transition-colors duration-150"
               >
                 <RotateCcw size={12} />
                 Clear
@@ -349,46 +384,72 @@ export default function AllShipmentsPage() {
           </div>
         </div>
 
-        {/* Active filter pills + result count */}
         {hasFilters && (
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/40 flex-wrap">
-            <span className="text-[0.70rem] text-muted-foreground font-bold uppercase tracking-wide">
-              Filters:
-            </span>
+            <span className="text-[0.70rem] text-muted-foreground font-bold uppercase tracking-wide">Filters:</span>
             {statusFilter !== 'all' && (
-              <span className={`
-                inline-flex items-center gap-1.5 px-2.5 py-0.5
-                rounded-full text-[0.70rem] font-bold border
-                ${STATUS_META[statusFilter].pill}
-              `}>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[0.70rem] font-bold border bg-primary/10 text-primary border-primary/20">
                 {statusFilter}
                 <button onClick={() => setStatus('all')}><X size={10} /></button>
               </span>
             )}
             {serviceFilter !== 'all' && (
-              <span className={`
-                inline-flex items-center gap-1.5 px-2.5 py-0.5
-                rounded-full text-[0.70rem] font-bold border
-                ${SERVICE_STYLES[serviceFilter]}
-              `}>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[0.70rem] font-bold border ${SERVICE_STYLES[serviceFilter]}`}>
                 {serviceFilter}
                 <button onClick={() => setService('all')}><X size={10} /></button>
               </span>
             )}
             <span className="text-[0.72rem] text-muted-foreground ml-auto">
-              {filtered.length} of {mockShipments.length} shipment{filtered.length !== 1 ? 's' : ''}
+              {pageData?.total ?? 0} shipment{(pageData?.total ?? 0) !== 1 ? 's' : ''}
             </span>
           </div>
         )}
       </div>
 
-      {/* ── Table ── */}
-      <DataTable
-        data={filtered}
-        columns={columns}
-        emptyMessage="No shipments match your filters"
-      />
-
+      {loading || !pageData ? (
+        <DataTable
+          data={[]}
+          columns={columns}
+          pageSize={pageSize}
+          controlledPagination
+          currentPage={1}
+          totalPages={1}
+          totalItems={0}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
+          loading
+        />
+      ) : pageData.items.length === 0 ? (
+        <EmptyState
+          icon={<Package className="w-8 h-8" />}
+          title="No shipments match your filters"
+          action={
+            hasFilters ? (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-destructive bg-destructive/10 border border-destructive/20 hover:bg-destructive/20 transition-colors"
+              >
+                <RotateCcw size={12} />
+                Clear Filters
+              </button>
+            ) : undefined
+          }
+        />
+      ) : (
+        <DataTable
+          data={pageData.items}
+          columns={columns}
+          emptyMessage="No shipments match your filters"
+          pageSize={pageSize}
+          controlledPagination
+          currentPage={pageData.page}
+          totalPages={pageData.totalPages}
+          totalItems={pageData.total}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
+          loading={loading}
+        />
+      )}
     </PageWrapper>
   );
 }

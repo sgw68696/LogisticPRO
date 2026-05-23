@@ -14,6 +14,7 @@ interface AuthContextType {
   hasPermission: (module: string, action: PermissionAction) => boolean;
   allowedMenuItems: string[];
   isSuperAdmin: boolean;
+  isOrganizationAdmin: boolean;
   isCompanyAdmin: boolean;
   isStaff: boolean;
   canManageUsers: boolean;
@@ -83,9 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const allowedMenuItems = user ? roleMenuConfig[user.role as UserRole] || [] : [];
   
   const isSuperAdmin = user?.role === 'SuperAdmin';
+  const isOrganizationAdmin = user?.role === 'OrganizationAdmin';
   const isCompanyAdmin = user?.role === 'CompanyAdmin';
   const isStaff = user?.role === 'Staff';
-  const canManageUsers = isSuperAdmin || isCompanyAdmin;
+  const canManageUsers = isSuperAdmin || isOrganizationAdmin || isCompanyAdmin;
   const canManageAgents = isCompanyAdmin || user?.role === 'Manager';
   
   const getCurrentCompanyId = useCallback(() => user?.companyId || null, [user]);
@@ -106,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasPermission,
         allowedMenuItems,
         isSuperAdmin,
+        isOrganizationAdmin,
         isCompanyAdmin,
         isStaff,
         canManageUsers,

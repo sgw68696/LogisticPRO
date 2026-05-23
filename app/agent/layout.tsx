@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { AgentSidebar } from '@/components/layout/AgentSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { agentRoleConfig } from '@/data/menu/sidebar-roles';
+import { agentMenu, type AgentMenuItem } from '@/data/menu/agent-menu';
+
+function filterMenuByAgentType(items: AgentMenuItem[], agentType: string): any[] {
+  return items
+    .filter(item => !item.visibleFor || item.visibleFor.includes(agentType as any))
+    .map(item => ({
+      ...item,
+      children: item.children ? filterMenuByAgentType(item.children, agentType) : undefined,
+    }));
+}
 
 export default function AgentLayout({
   children,
@@ -21,10 +32,8 @@ export default function AgentLayout({
       return;
     }
     
-    // Allow only Agent role
     if (!isLoading && isAuthenticated && user) {
       if (user.role !== 'Agent') {
-        // Redirect to their own dashboard
         const dashboardRoute = localStorage.getItem('loggedInUser') 
           ? JSON.parse(localStorage.getItem('loggedInUser') || '{}').dashboardRoute 
           : '/login';
@@ -32,6 +41,18 @@ export default function AgentLayout({
       }
     }
   }, [isAuthenticated, isLoading, user, router]);
+
+  const agentType = useMemo(() => {
+    if (typeof window === 'undefined') return 'warehouse';
+    const storedUser = localStorage.getItem('loggedInUser');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      return (parsed.agentType as string) || 'warehouse';
+    }
+    return 'warehouse';
+  }, []);
+
+  const filteredMenu = useMemo(() => filterMenuByAgentType(agentMenu, agentType), [agentType]);
 
   if (isLoading) {
     return (
@@ -50,7 +71,7 @@ export default function AgentLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <AgentSidebar />
+      <AppSidebar role={agentRoleConfig} menuItems={filteredMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

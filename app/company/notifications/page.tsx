@@ -1,5 +1,7 @@
-import { CompanyDataPage } from '@/components/company/CompanyAdminPages';
+'use client';
+
+import { CompanyNotificationsPage } from '@/components/company/CompanyNotificationsPage';
 
 export default function NotificationsPage() {
-  return <CompanyDataPage pageKey="notifications" title="Notifications" />;
+  return <CompanyNotificationsPage />;
 }

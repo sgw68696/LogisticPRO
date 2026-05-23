@@ -3,9 +3,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { SuperAdminSidebar } from '@/components/layout/SuperAdminSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { superAdminRoleConfig } from '@/data/menu/sidebar-roles';
+import { superAdminMenu } from '@/data/menu/super-admin-menu';
 
 export default function AdminLayout({
   children,
@@ -41,7 +43,7 @@ export default function AdminLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <SuperAdminSidebar />
+      <AppSidebar role={superAdminRoleConfig} menuItems={superAdminMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

@@ -1,5 +1,7 @@
-import { CompanyDataPage } from '@/components/company/CompanyAdminPages';
+'use client';
 
-export default function CompanyUsersPage() {
-  return <CompanyDataPage pageKey="users" title="Company Users" />;
+import { CompanyUsersPage } from '@/components/company/CompanyUsersPage';
+
+export default function CompanyUsersPageRoute() {
+  return <CompanyUsersPage />;
 }

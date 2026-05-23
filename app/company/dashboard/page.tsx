@@ -1,3 +1,7 @@
-import { CompanyDashboardPage } from '@/components/company/CompanyAdminPages';
+'use client';
 
-export default CompanyDashboardPage;
+import { CompanyDashboard } from '@/components/company/CompanyDashboard';
+
+export default function CompanyDashboardPage() {
+  return <CompanyDashboard />;
+}

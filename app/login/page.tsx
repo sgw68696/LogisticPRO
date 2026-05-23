@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Truck, AlertCircle, Eye, EyeOff, Package, MapPin, BarChart3, Zap, ChevronDown } from 'lucide-react';
+import Link from 'next/link';
 import MagneticButton from '@/components/layout/MagneticButton';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,7 @@ import { mockUsers, type UserRole } from '@/data/mockData';
 
 const roleBadgeVariants: Record<UserRole, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   SuperAdmin: 'destructive',
+  OrganizationAdmin: 'default',
   CompanyAdmin: 'default',
   Manager: 'default',
   Dispatcher: 'default',
@@ -264,7 +266,9 @@ export default function LoginPage() {
           <div >
             <div className="brand mb-4 flex items-center justify-center">
               {/* <AnimatedLogo /> */}
-              <Image src="/LogisticsProLogo.png" alt="Logo" width={220} height={220} className='bg-white bg-opacity-20 rounded-lg' />
+              <Link href="/">
+                <Image src="/LogisticsProLogo.png" alt="Logo" width={220} height={220} className='bg-white bg-opacity-20 rounded-lg cursor-pointer transition-transform hover:scale-105' />
+              </Link>
             </div>
 
             <p className="tagline">

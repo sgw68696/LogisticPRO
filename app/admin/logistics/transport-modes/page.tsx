@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import {
   Plus, Pencil, Trash2,
@@ -179,10 +179,10 @@ export default function TransportModesPage() {
           { label: 'Active',        value: activeCount,    pill: 'bg-success/10 text-success border-success/20'        },
           { label: 'Total Fleet',   value: totalFleet,     pill: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
           { label: 'Active Cargo',  value: mockCargo.length, pill: 'bg-sky-500/10 text-sky-400 border-sky-500/20'     },
-        ].map(({ label, value, pill }, i) => (
-          <>
-            {i > 0 && <div key={`d${i}`} className="w-px h-4 bg-border/50" />}
-            <div key={label} className="flex items-center gap-2">
+         ].map(({ label, value, pill }, i) => (
+          <React.Fragment key={label}>
+            {i > 0 && <div className="w-px h-4 bg-border/50" />}
+            <div className="flex items-center gap-2">
               <span className="text-[0.72rem] font-bold text-muted-foreground uppercase tracking-wide">
                 {label}
               </span>
@@ -190,7 +190,7 @@ export default function TransportModesPage() {
                 {value}
               </span>
             </div>
-          </>
+          </React.Fragment>
         ))}
       </div>
 

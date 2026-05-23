@@ -3,9 +3,12 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { OpsSidebar } from '@/components/layout/OpsSidebar';
+import { useMemo } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Spinner } from '@/components/ui/spinner';
+import { AppSidebar } from '@/components/layout/Sidebar/AppSidebar';
+import { dispatcherRoleConfig, operatorRoleConfig } from '@/data/menu/sidebar-roles';
+import { opsMenu } from '@/data/menu/ops-menu';
 
 export default function OpsLayout({
   children,
@@ -21,10 +24,8 @@ export default function OpsLayout({
       return;
     }
     
-    // Allow only Dispatcher and Operator roles
     if (!isLoading && isAuthenticated && user) {
       if (user.role !== 'Dispatcher' && user.role !== 'Operator') {
-        // Redirect to their own dashboard
         const dashboardRoute = localStorage.getItem('loggedInUser') 
           ? JSON.parse(localStorage.getItem('loggedInUser') || '{}').dashboardRoute 
           : '/login';
@@ -32,6 +33,10 @@ export default function OpsLayout({
       }
     }
   }, [isAuthenticated, isLoading, user, router]);
+
+  const roleConfig = useMemo(() => 
+    user?.role === 'Operator' ? operatorRoleConfig : dispatcherRoleConfig,
+  [user?.role]);
 
   if (isLoading) {
     return (
@@ -50,7 +55,7 @@ export default function OpsLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <OpsSidebar />
+      <AppSidebar role={roleConfig} menuItems={opsMenu} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-y-auto p-6">

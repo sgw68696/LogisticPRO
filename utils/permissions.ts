@@ -1,4 +1,7 @@
-import { type User, type UserRole, type PermissionAction, rolePermissions } from '@/data/mockData';
+import type { User } from '@/types/user';
+import type { UserRole } from '@/types/enums';
+import { PERMISSIONS } from '@/config/permissions';
+import type { PermissionAction } from '@/config/permissions';
 
 /**
  * Check if a user has a specific permission
@@ -10,7 +13,7 @@ export function hasPermission(
 ): boolean {
   if (!user) return false;
   
-  const permissions = rolePermissions[user.role as UserRole];
+  const permissions = PERMISSIONS[user.role as UserRole];
   if (!permissions) return false;
   
   return permissions[module]?.[action] ?? false;
@@ -69,7 +72,7 @@ export function canManageTransport(user: User | null): boolean {
 export function getAccessibleModules(user: User | null): string[] {
   if (!user) return [];
   
-  const permissions = rolePermissions[user.role as UserRole];
+  const permissions = PERMISSIONS[user.role as UserRole];
   if (!permissions) return [];
   
   return Object.keys(permissions).filter(module => permissions[module].view);

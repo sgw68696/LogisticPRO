@@ -1,13 +1,35 @@
 // MOCK DATA FOR LOGISTICS MANAGEMENT SYSTEM
+//
+// NOTE: Shared types are now centralized in /types/ (e.g. @/types/shipment, @/types/driver, etc.)
+// Existing code importing from this file continues to work.
+// NEW code should import types from @/types/* for consistency.
 
+// ============================================
+// RE-EXPORT SHARED TYPES (backward compatible)
+// ============================================
+export type { ConsolidatedShipment, LegacyShipment, ShipmentDashboardStats, ShipmentViewRole } from '@/types/shipment';
+export type { Container, ContainerEvent } from '@/types/container';
+export type { FleetVehicle } from '@/types/vehicle';
+export type { PortalNotification } from '@/types/user';
+export type { BookingStatus, MilestoneStatus } from '@/types/enums';
+
+// ============================================
 // MULTI-TENANCY & ENTERPRISE TYPES
+// ============================================
 export type CompanyStatus = 'Active' | 'Pending' | 'Suspended' | 'Inactive';
 export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
 export type UserRole =
-  | 'SuperAdmin' | 'CompanyAdmin' | 'Manager'
+  | 'SuperAdmin' | 'OrganizationAdmin' | 'CompanyAdmin' | 'Manager'
   | 'Dispatcher' | 'Operator' | 'Agent' | 'Staff'
   | 'CustomsAgent' | 'PortAgent' | 'CustomerPortal' | 'AuditorReadOnly';
 export type AgentType = 'warehouse' | 'driver' | 'finance';
+export type CompanyOperationalType =
+  | 'standard'
+  | 'custom_agent'
+  | 'destination_agent'
+  | 'origin_agent'
+  | 'transporter'
+  | 'trucking_agent';
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
 
 // LOGISTICS OPERATION TYPES
@@ -34,6 +56,7 @@ export interface Company {
   country: string;
   taxId: string;
   businessType: 'Freight' | 'Express' | 'Courier' | 'Logistics' | 'Mixed';
+  companyType?: CompanyOperationalType;
   registrationDate: string;
   approvalDate: string | null;
   approvedBy: string | null; // SuperAdmin user ID
@@ -409,6 +432,8 @@ export interface AgentPermission {
 }
 
 export interface Shipment {
+  customerName: any;
+  customer: any;
   id: string;
   trackingNumber: string;
   senderName: string;
@@ -542,6 +567,7 @@ export interface MockUser {
   phone: string;
   role: UserRole;
   agentType?: AgentType;
+  companyType?: CompanyOperationalType;
   status: 'Active' | 'Inactive';
   companyId: string | null;
   organizationId: string | null;
@@ -549,6 +575,8 @@ export interface MockUser {
   avatar: string;
   dashboardRoute: string;
   menuAccess: string[];
+  assignedMenus?: string[];
+  assignedModules?: string[];
   lastLogin: string;
   createdAt: string;
 }
@@ -791,17 +819,19 @@ export const mockTransportItems: TransportItem[] = [
 ];
 
 export const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
-  SuperAdmin:      '/admin/dashboard',
-  CompanyAdmin:    '/company/dashboard',
-  Manager:         '/manager/dashboard',
-  Dispatcher:      '/ops/dashboard',
-  Operator:        '/ops/dashboard',
-  Agent:           '/agent/dashboard',
-  Staff:           '/staff/dashboard',
-  CustomsAgent:    '/customs/dashboard',
-  PortAgent:       '/port/dashboard',
-  CustomerPortal:  '/portal/dashboard',
-  AuditorReadOnly: '/audit/dashboard',
+  SuperAdmin:        '/admin/dashboard',
+  OrganizationAdmin: '/orgadmin/dashboard',
+  CompanyAdmin:      '/company/dashboard',
+  Manager:           '/manager/dashboard',
+  Dispatcher:        '/ops/dashboard',
+  Operator:          '/ops/dashboard',
+  Agent:             '/agent/dashboard',
+  Staff:             '/staff/dashboard',
+  CustomsAgent:      '/customs/dashboard',
+  PortAgent:         '/port/dashboard',
+  Driver:            '/driver/dashboard',
+  CustomerPortal:    '/portal/dashboard',
+  AuditorReadOnly:   '/audit/dashboard',
 };
 
 export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
@@ -825,6 +855,14 @@ export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
     '/admin/workflow/email-templates', '/admin/workflow/notification-templates', '/admin/workflow/document-types',
     '/admin/system/settings', '/admin/system/integrations', '/admin/system/api-config', '/admin/system/security',
     '/admin/audit/logs', '/admin/audit/error-logs', '/admin/audit/access-logs', '/admin/audit/system-activity',
+  ],
+  OrganizationAdmin: [
+    '/orgadmin/dashboard',
+    '/orgadmin/companies', '/orgadmin/companies/new',
+    '/orgadmin/companies/detail',
+    '/orgadmin/analytics',
+    '/orgadmin/users',
+    '/orgadmin/settings',
   ],
   CompanyAdmin: [
     '/company/dashboard',
@@ -909,6 +947,15 @@ export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
     '/port/containers', '/port/manifests', '/port/cargo-log',
     '/port/charges', '/port/documents', '/port/reports', '/port/notifications',
   ],
+  Driver: [
+    '/driver/dashboard',
+    '/driver/trips',
+    '/driver/deliveries',
+    '/driver/pod',
+    '/driver/earnings',
+    '/driver/profile',
+    '/driver/notifications',
+  ],
   CustomerPortal: [
     '/portal/dashboard',
     '/portal/shipments', '/portal/tracking',
@@ -978,6 +1025,15 @@ export const mockUsers: MockUser[] = [
     lastLogin: '2025-01-15T06:00:00Z', createdAt: '2024-05-20T00:00:00Z',
   },
   {
+    id: 'usr-016', name: 'Ramesh Kumar', username: 'driver', password: 'driver123',
+    email: 'ramesh.kumar@techlogistics.com', phone: '+91 98765 43230',
+    role: 'Driver', status: 'Active',
+    companyId: 'cmp-001', organizationId: null, agentId: null,
+    avatar: 'RK', dashboardRoute: '/driver/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Driver'],
+    lastLogin: '2025-01-15T07:30:00Z', createdAt: '2024-09-01T00:00:00Z',
+  },
+  {
     id: 'usr-006', name: 'Ananya Gupta', username: 'finance', password: 'finance123',
     email: 'ananya.gupta@techlogistics.com', phone: '+91 98765 43215',
     role: 'Agent', agentType: 'finance', status: 'Active',
@@ -998,11 +1054,20 @@ export const mockUsers: MockUser[] = [
   {
     id: 'usr-008', name: 'Vikram Sharma', username: 'company_admin', password: 'admin123',
     email: 'admin@techlogistics.com', phone: '+91 98765 43217',
-    role: 'CompanyAdmin', status: 'Active',
+    role: 'CompanyAdmin', status: 'Active', companyType: 'custom_agent',
     companyId: 'cmp-001', organizationId: null, agentId: null,
     avatar: 'VS', dashboardRoute: '/company/dashboard',
     menuAccess: ROLE_MENU_ACCESS['CompanyAdmin'],
     lastLogin: '2025-01-14T14:30:00Z', createdAt: '2024-08-01T00:00:00Z',
+  },
+  {
+    id: 'usr-015', name: 'Rajesh OrgAdmin', username: 'orgadmin', password: 'orgadmin123',
+    email: 'rajesh.org@globalgroup.com', phone: '+91 98765 43240',
+    role: 'OrganizationAdmin', status: 'Active', companyType: 'standard',
+    companyId: null, organizationId: 'org-001', agentId: null,
+    avatar: 'RO', dashboardRoute: '/orgadmin/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['OrganizationAdmin'],
+    lastLogin: '2025-01-15T09:00:00Z', createdAt: '2024-11-01T00:00:00Z',
   },
   {
     id: 'usr-009', name: 'Rajesh Verma', username: 'operator01', password: 'operator123',
@@ -1712,6 +1777,9 @@ export const mockAnalytics = {
     { type: 'Tempo', total: 3, active: 2, maintenance: 0 },
   ],
 };
+
+// NOTE: roleMenuConfig and rolePermissions below are retained for backward compatibility.
+// NEW code should use the canonical permission source at @/config/permissions.
 
 // Role-based menu configuration
 export const roleMenuConfig: Record<UserRole, string[]> = {
