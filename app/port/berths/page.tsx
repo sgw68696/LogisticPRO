@@ -1,424 +1,802 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { portService } from '@/services/port/portService';
+import type { Berth, BerthStatus } from '@/types/port';
+import type { Vessel } from '@/types/port';
 import { PageWrapper } from '@/components/layout/PageWrapper';
+import { DataTable, Column } from '@/components/shared/DataTable';
 import { KPICard } from '@/components/shared/KPICard';
-import { SkeletonLoader } from '@/components/shared/SkeletonLoader';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dock,
-  Search,
-  Anchor,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  Eye,
-  Edit,
-  Trash2,
-  X,
-  MapPin,
-  Timer,
-  Sailboat,
-  Container,
-  Ship,
-  Wrench,
-  GanttChartSquare,
-  ArrowRight,
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '@/components/ui/drawer';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn, formatDate } from '@/lib/utils';
+import { exportToCSV } from '@/lib/export-utils';
+import { toast } from 'sonner';
+import { Anchor, Waves, Wrench, CheckCircle, Ship, Clock, Search, X, RotateCcw, Plus, Eye, Pencil, Trash2, Download, ArrowUpDown, Ruler, Drill, Container, Dock } from 'lucide-react';
 
-// ─── Types ──────────────────────────────────────────────────────────────
-type BerthStatus = 'Occupied' | 'Available' | 'Maintenance' | 'Reserved' | 'Departing';
-type BerthType = 'Container' | 'Bulk' | 'Liquid' | 'Passenger' | 'Repair';
-type VesselClass = 'Feeder' | 'Panamax' | 'Post-Panamax' | 'Ultra-Large' | 'VLCC';
+const berthStatusColors: Record<string, string> = {
+  Available: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Occupied: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Reserved: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Maintenance: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  'Out of Service': 'bg-red-500/10 text-red-400 border-red-500/20',
+};
 
-interface Berth {
-  id: string;
-  berth: string;
-  type: BerthType;
-  status: BerthStatus;
-  vessel: string | null;
-  vesselClass: VesselClass | null;
-  imo: string | null;
-  operator: string | null;
-  eta: string | null;
-  etd: string | null;
-  cargoDescription: string | null;
-  containerCount: number | null;
-  depth: number;
-  length: number;
-  maxDraft: number;
-  occupancyRate: number;
-  lastMaintenance: string;
+const berthStatusDot: Record<string, string> = {
+  Available: 'bg-emerald-400', Occupied: 'bg-amber-400',
+  Reserved: 'bg-blue-400', Maintenance: 'bg-purple-400', 'Out of Service': 'bg-red-400',
+};
+
+const berthTypeColors: Record<string, string> = {
+  Container: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  Bulk: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Liquid: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  General: 'bg-green-500/10 text-green-400 border-green-500/20',
+  Passenger: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  Repair: 'bg-red-500/10 text-red-400 border-red-500/20',
+};
+
+const statusPillsOrder = [
+  'All', 'Available', 'Occupied', 'Reserved', 'Maintenance', 'Out of Service',
+] as const;
+
+const berthTypeOptions = ['Container', 'Bulk', 'Liquid', 'General', 'Passenger', 'Repair'] as const;
+
+const statusOptions: BerthStatus[] = ['Available', 'Occupied', 'Reserved', 'Maintenance', 'Out of Service'];
+
+interface BerthFormData {
+  name: string; type: typeof berthTypeOptions[number];
+  depth: number; length: number; maxDraft: number;
+  maxVesselLength: number; maxVesselBeam: number;
+  craneCapacity: string; craneCount: number;
+  operator: string; equipment: string; services: string; notes: string;
 }
 
-// ─── Status Meta ────────────────────────────────────────────────────────
-const STATUS_META: Record<BerthStatus, { pill: string; dot: string }> = {
-  Occupied: {
-    pill: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    dot: 'bg-blue-400',
-  },
-  Available: {
-    pill: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    dot: 'bg-emerald-400',
-  },
-  Maintenance: {
-    pill: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    dot: 'bg-amber-400',
-  },
-  Reserved: {
-    pill: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    dot: 'bg-indigo-400',
-  },
-  Departing: {
-    pill: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    dot: 'bg-violet-400',
-  },
+const defaultFormData: BerthFormData = {
+  name: '', type: 'Container',
+  depth: 12, length: 300, maxDraft: 14,
+  maxVesselLength: 320, maxVesselBeam: 45,
+  craneCapacity: '50T', craneCount: 2,
+  operator: 'Port Authority', equipment: '', services: '', notes: '',
 };
 
-const TYPE_META: Record<BerthType, { icon: typeof Dock; color: string; bg: string }> = {
-  Container: { icon: Container, color: 'text-sky-400', bg: 'bg-sky-500/10' },
-  Bulk: { icon: Anchor, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  Liquid: { icon: Ship, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-  Passenger: { icon: Sailboat, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  Repair: { icon: Wrench, color: 'text-rose-400', bg: 'bg-rose-500/10' },
-};
-
-// ─── Mock Data ──────────────────────────────────────────────────────────
-const berths: Berth[] = [
-  { id: 'BTH-001', berth: 'A-01', type: 'Container', status: 'Occupied', vessel: 'CMA CGM ALTAMIRA', vesselClass: 'Post-Panamax', imo: '9961350', operator: 'DP World', eta: '2026-05-13 08:15', etd: '2026-05-13 18:30', cargoDescription: 'Mixed Container Cargo', containerCount: 34, depth: 15, length: 350, maxDraft: 14, occupancyRate: 85, lastMaintenance: '2026-04-01' },
-  { id: 'BTH-002', berth: 'A-02', type: 'Container', status: 'Available', vessel: null, vesselClass: null, imo: null, operator: null, eta: null, etd: null, cargoDescription: null, containerCount: null, depth: 15, length: 350, maxDraft: 14, occupancyRate: 0, lastMaintenance: '2026-04-15' },
-  { id: 'BTH-003', berth: 'B-01', type: 'Bulk', status: 'Occupied', vessel: 'SHANDONG HONOR', vesselClass: 'Ultra-Large', imo: '9786543', operator: 'Adani Ports', eta: '2026-05-12 22:00', etd: '2026-05-14 06:00', cargoDescription: 'Iron Ore', containerCount: null, depth: 18, length: 330, maxDraft: 16, occupancyRate: 72, lastMaintenance: '2026-03-20' },
-  { id: 'BTH-004', berth: 'B-02', type: 'Bulk', status: 'Maintenance', vessel: null, vesselClass: null, imo: null, operator: null, eta: null, etd: null, cargoDescription: null, containerCount: null, depth: 18, length: 330, maxDraft: 16, occupancyRate: 0, lastMaintenance: '2026-05-10' },
-  { id: 'BTH-005', berth: 'C-01', type: 'Liquid', status: 'Reserved', vessel: 'MT CHEMSTAR', vesselClass: 'VLCC', imo: '9214567', operator: 'Shell Terminal', eta: '2026-05-15 06:00', etd: '2026-05-15 18:00', cargoDescription: 'Crude Oil (150k tons)', containerCount: null, depth: 20, length: 370, maxDraft: 18, occupancyRate: 0, lastMaintenance: '2026-04-28' },
-  { id: 'BTH-006', berth: 'C-02', type: 'Liquid', status: 'Occupied', vessel: 'EXXON VALDEZ II', vesselClass: 'VLCC', imo: '9567890', operator: 'BP Terminal', eta: '2026-05-11 14:00', etd: '2026-05-14 12:00', cargoDescription: 'LNG (200k tons)', containerCount: null, depth: 20, length: 370, maxDraft: 18, occupancyRate: 65, lastMaintenance: '2026-03-10' },
-  { id: 'BTH-007', berth: 'D-01', type: 'Container', status: 'Occupied', vessel: 'MSC ZOE', vesselClass: 'Ultra-Large', imo: '9212345', operator: 'PSA International', eta: '2026-05-13 22:45', etd: '2026-05-14 10:30', cargoDescription: 'Mixed Container Cargo', containerCount: 18, depth: 16, length: 400, maxDraft: 15, occupancyRate: 45, lastMaintenance: '2026-04-20' },
-  { id: 'BTH-008', berth: 'D-02', type: 'Container', status: 'Departing', vessel: 'OOCL HONG KONG', vesselClass: 'Post-Panamax', imo: '9705123', operator: 'DP World', eta: '2026-05-14 06:10', etd: '2026-05-14 20:00', cargoDescription: 'Electronics & Apparel', containerCount: 28, depth: 16, length: 350, maxDraft: 15, occupancyRate: 30, lastMaintenance: '2026-05-05' },
-  { id: 'BTH-009', berth: 'E-01', type: 'Passenger', status: 'Available', vessel: null, vesselClass: null, imo: null, operator: null, eta: null, etd: null, cargoDescription: null, containerCount: null, depth: 12, length: 300, maxDraft: 10, occupancyRate: 0, lastMaintenance: '2026-05-08' },
-  { id: 'BTH-010', berth: 'E-02', type: 'Repair', status: 'Occupied', vessel: 'COSCO PRIDE', vesselClass: 'Ultra-Large', imo: '9567890', operator: 'DryDock Corp', eta: '2026-05-10 09:00', etd: '2026-05-20 21:00', cargoDescription: 'Scheduled Dry Dock Maintenance', containerCount: null, depth: 14, length: 360, maxDraft: 12, occupancyRate: 100, lastMaintenance: '2026-05-10' },
-];
-
-// ─── Occupancy Bar ──────────────────────────────────────────────────────
 function OccupancyBar({ rate }: { rate: number }) {
-  const color = rate > 85 ? 'bg-destructive' : rate > 65 ? 'bg-amber-400' : 'bg-emerald-400';
+  const color = rate > 85 ? 'bg-red-400' : rate > 65 ? 'bg-amber-400' : 'bg-emerald-400';
   return (
-    <div className="w-full h-1.5 bg-muted/40 rounded-full overflow-hidden">
-      <div
-        className={`h-full rounded-full transition-all duration-500 ${color}`}
-        style={{ width: `${rate}%` }}
-      />
+    <div className="flex items-center gap-2 min-w-[100px]">
+      <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all duration-500', color)} style={{ width: `${rate}%` }} />
+      </div>
+      <span className="text-xs font-medium tabular-nums w-10 text-right">{rate}%</span>
     </div>
   );
 }
 
-// ─── Main Page ──────────────────────────────────────────────────────────
-export default function PortBerthsPage() {
+export default function BerthAllocationPage() {
+  const [data, setData] = useState<Berth[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
-  const [loading, setLoading] = useState(false);
+  const [vessels, setVessels] = useState<Vessel[]>([]);
 
-  const berthTypes = useMemo(() => [...new Set(berths.map(b => b.type))], []);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingBerth, setEditingBerth] = useState<Berth | null>(null);
+  const [formData, setFormData] = useState<BerthFormData>(defaultFormData);
+  const [saving, setSaving] = useState(false);
 
-  const filtered = useMemo(() => {
-    let result = [...berths];
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedBerth, setSelectedBerth] = useState<Berth | null>(null);
 
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(b =>
-        b.berth.toLowerCase().includes(q) ||
-        (b.vessel && b.vessel.toLowerCase().includes(q)) ||
-        b.type.toLowerCase().includes(q) ||
-        (b.operator && b.operator.toLowerCase().includes(q)) ||
-        (b.cargoDescription && b.cargoDescription.toLowerCase().includes(q))
-      );
+  const [deletingBerth, setDeletingBerth] = useState<Berth | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const [allocateOpen, setAllocateOpen] = useState(false);
+  const [allocateVesselName, setAllocateVesselName] = useState('');
+  const [allocateVesselId, setAllocateVesselId] = useState('');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await portService.listBerths({
+        search: search || undefined,
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+        type: typeFilter !== 'All' ? typeFilter : undefined,
+      });
+      setData(result);
+    } catch {
+      setError('Failed to load berth data');
+    } finally {
+      setLoading(false);
     }
-    if (statusFilter !== 'All') {
-      result = result.filter(b => b.status === statusFilter);
-    }
-    if (typeFilter !== 'All') {
-      result = result.filter(b => b.type === typeFilter);
-    }
-
-    return result;
   }, [search, statusFilter, typeFilter]);
 
-  const stats = useMemo(() => {
-    const total = berths.length;
-    const occupied = berths.filter(b => b.status === 'Occupied').length;
-    const available = berths.filter(b => b.status === 'Available').length;
-    const maintenance = berths.filter(b => b.status === 'Maintenance').length;
-    const reserved = berths.filter(b => b.status === 'Reserved').length;
-    const avgOccupancy = Math.round(berths.reduce((s, b) => s + b.occupancyRate, 0) / total);
-    return { total, occupied, available, maintenance, reserved, avgOccupancy };
+  const fetchVessels = useCallback(async () => {
+    try {
+      const result = await portService.listVessels({});
+      setVessels(result);
+    } catch {
+      // silent
+    }
   }, []);
 
-  const statusPills: { label: BerthStatus | 'All'; count: number }[] = [
-    { label: 'All', count: berths.length },
-    { label: 'Occupied', count: stats.occupied },
-    { label: 'Available', count: stats.available },
-    { label: 'Reserved', count: stats.reserved },
-    { label: 'Departing', count: berths.filter(b => b.status === 'Departing').length },
-    { label: 'Maintenance', count: stats.maintenance },
-  ];
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const stats = useMemo(() => {
+    const total = data.length;
+    const occupied = data.filter(b => b.status === 'Occupied').length;
+    const available = data.filter(b => b.status === 'Available').length;
+    const maintenance = data.filter(b => b.status === 'Maintenance').length;
+    return { total, occupied, available, maintenance };
+  }, [data]);
+
+  const filtered = useMemo(() => {
+    if (!search) return data;
+    const q = search.toLowerCase();
+    return data.filter(b =>
+      b.name.toLowerCase().includes(q) ||
+      b.operator.toLowerCase().includes(q) ||
+      (b.currentVessel && b.currentVessel.toLowerCase().includes(q))
+    );
+  }, [data, search]);
+
+  const resetForm = useCallback((berth?: Berth | null) => {
+    if (berth) {
+      setFormData({
+        name: berth.name, type: berth.type,
+        depth: berth.depth, length: berth.length,
+        maxDraft: berth.maxDraft, maxVesselLength: berth.maxVesselLength,
+        maxVesselBeam: berth.maxVesselBeam,
+        craneCapacity: berth.craneCapacity, craneCount: berth.craneCount,
+        operator: berth.operator,
+        equipment: berth.equipment.join(', '),
+        services: berth.services.join(', '),
+        notes: berth.notes,
+      });
+    } else {
+      setFormData(defaultFormData);
+    }
+  }, []);
+
+  const openCreate = useCallback(() => {
+    setEditingBerth(null);
+    resetForm(null);
+    setDialogOpen(true);
+  }, [resetForm]);
+
+  const openEdit = useCallback((berth: Berth) => {
+    setEditingBerth(berth);
+    resetForm(berth);
+    setDialogOpen(true);
+  }, [resetForm]);
+
+  const openDrawer = useCallback((berth: Berth) => {
+    setSelectedBerth(berth);
+    setDrawerOpen(true);
+  }, []);
+
+  const openAllocate = useCallback((berth: Berth) => {
+    setSelectedBerth(berth);
+    setAllocateVesselName('');
+    setAllocateVesselId('');
+    fetchVessels();
+    setAllocateOpen(true);
+  }, [fetchVessels]);
+
+  const handleFormChange = useCallback((field: keyof BerthFormData, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        ...formData,
+        depth: Number(formData.depth), length: Number(formData.length),
+        maxDraft: Number(formData.maxDraft),
+        maxVesselLength: Number(formData.maxVesselLength),
+        maxVesselBeam: Number(formData.maxVesselBeam),
+        craneCount: Number(formData.craneCount),
+        equipment: formData.equipment.split(',').map(s => s.trim()).filter(Boolean),
+        services: formData.services.split(',').map(s => s.trim()).filter(Boolean),
+      };
+      if (editingBerth) {
+        const updated = await portService.updateBerth(editingBerth.id, payload);
+        setData(prev => prev.map(b => b.id === editingBerth.id ? { ...b, ...payload, updatedAt: new Date().toISOString() } as Berth : b));
+        toast.success('Berth updated successfully');
+      } else {
+        const created = await portService.createBerth(payload);
+        setData(prev => [...prev, created]);
+        toast.success('Berth created successfully');
+      }
+      setDialogOpen(false);
+    } catch {
+      toast.error('Failed to save berth');
+    } finally {
+      setSaving(false);
+    }
+  }, [formData, editingBerth]);
+
+  const handleDelete = useCallback(async () => {
+    if (!deletingBerth) return;
+    try {
+      await portService.deleteBerth(deletingBerth.id);
+      setData(prev => prev.filter(b => b.id !== deletingBerth.id));
+      toast.success('Berth deleted');
+      setDeleteOpen(false);
+      setDeletingBerth(null);
+    } catch {
+      toast.error('Failed to delete berth');
+    }
+  }, [deletingBerth]);
+
+  const handleAllocate = useCallback(async () => {
+    if (!selectedBerth || !allocateVesselName) return;
+    try {
+      await portService.updateBerth(selectedBerth.id, {
+        status: 'Occupied',
+        currentVessel: allocateVesselName,
+        currentVesselId: allocateVesselId || undefined,
+        occupancyStart: new Date().toISOString(),
+        occupancyEnd: null,
+        occupancyRate: 100,
+      });
+      setData(prev => prev.map(b => b.id === selectedBerth.id ? {
+        ...b, status: 'Occupied' as BerthStatus,
+        currentVessel: allocateVesselName,
+        currentVesselId: allocateVesselId || null,
+        occupancyStart: new Date().toISOString(),
+        occupancyEnd: null, occupancyRate: 100,
+      } as Berth : b));
+      if (selectedBerth.id === selectedBerth.id) {
+        setSelectedBerth(prev => prev ? { ...prev, status: 'Occupied', currentVessel: allocateVesselName, occupancyRate: 100 } : null);
+      }
+      toast.success(`Berth allocated to ${allocateVesselName}`);
+      setAllocateOpen(false);
+    } catch {
+      toast.error('Failed to allocate berth');
+    }
+  }, [selectedBerth, allocateVesselName, allocateVesselId]);
+
+  const handleRelease = useCallback(async (berth: Berth) => {
+    try {
+      await portService.updateBerth(berth.id, {
+        status: 'Available',
+        currentVessel: null,
+        currentVesselId: null,
+        occupancyEnd: new Date().toISOString(),
+        occupancyRate: 0,
+      });
+      setData(prev => prev.map(b => b.id === berth.id ? {
+        ...b, status: 'Available' as BerthStatus,
+        currentVessel: null, currentVesselId: null,
+        occupancyEnd: new Date().toISOString(), occupancyRate: 0,
+      } as Berth : b));
+      if (selectedBerth?.id === berth.id) {
+        setSelectedBerth(prev => prev ? { ...prev, status: 'Available', currentVessel: null, occupancyRate: 0 } : null);
+      }
+      toast.success('Berth released');
+    } catch {
+      toast.error('Failed to release berth');
+    }
+  }, [selectedBerth]);
+
+  const handleExportCSV = useCallback(() => {
+    if (filtered.length === 0) { toast.error('No data to export'); return; }
+    exportToCSV(
+      filtered.map(b => ({
+        name: b.name, type: b.type, status: b.status,
+        depth: b.depth, length: b.length,
+        maxDraft: b.maxDraft, maxVesselLength: b.maxVesselLength,
+        maxVesselBeam: b.maxVesselBeam,
+        craneCapacity: b.craneCapacity, craneCount: b.craneCount,
+        operator: b.operator, currentVessel: b.currentVessel || '',
+        occupancyRate: b.occupancyRate,
+      })),
+      'berths-export',
+      [
+        { key: 'name', label: 'Berth Name' },
+        { key: 'type', label: 'Type' },
+        { key: 'status', label: 'Status' },
+        { key: 'depth', label: 'Depth (m)' },
+        { key: 'length', label: 'Length (m)' },
+        { key: 'maxDraft', label: 'Max Draft (m)' },
+        { key: 'maxVesselLength', label: 'Max Vessel Length (m)' },
+        { key: 'maxVesselBeam', label: 'Max Vessel Beam (m)' },
+        { key: 'craneCapacity', label: 'Crane Capacity' },
+        { key: 'craneCount', label: 'Crane Count' },
+        { key: 'operator', label: 'Operator' },
+        { key: 'currentVessel', label: 'Current Vessel' },
+        { key: 'occupancyRate', label: 'Occupancy Rate (%)' },
+      ]
+    );
+    toast.success('Berths exported to CSV');
+  }, [filtered]);
+
+  const statusPills = useMemo(() => {
+    const counts: Record<string, number> = { All: data.length };
+    data.forEach(b => { counts[b.status] = (counts[b.status] || 0) + 1; });
+    return statusPillsOrder.map(label => ({ label, count: counts[label] || 0 }));
+  }, [data]);
+
+  const columns: Column<Berth>[] = useMemo(() => [
+    {
+      key: 'name', header: 'Berth Name', sortable: true,
+      render: (b) => (
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <Dock className="w-4 h-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">{b.name}</p>
+            <p className="text-xs text-muted-foreground">{b.operator}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'type', header: 'Type', sortable: true,
+      render: (b) => (
+        <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-bold border', berthTypeColors[b.type] || '')}>
+          {b.type}
+        </span>
+      ),
+    },
+    {
+      key: 'status', header: 'Status', sortable: true,
+      render: (b) => (
+        <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border', berthStatusColors[b.status])}>
+          <span className={cn('w-1.5 h-1.5 rounded-full', berthStatusDot[b.status] || 'bg-muted-foreground')} />
+          {b.status}
+        </span>
+      ),
+    },
+    {
+      key: 'depth', header: 'Specs',
+      render: (b) => (
+        <div className="text-xs text-muted-foreground whitespace-nowrap">
+          <p>Depth: {b.depth}m</p>
+          <p>Length: {b.length}m</p>
+        </div>
+      ),
+    },
+    {
+      key: 'currentVessel', header: 'Current Vessel', sortable: true,
+      render: (b) => (
+        <span className="text-sm">
+          {b.currentVessel ? (
+            <span className="flex items-center gap-1.5">
+              <Ship className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              {b.currentVessel}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'occupancyRate', header: 'Occupancy', sortable: true,
+      render: (b) => <OccupancyBar rate={b.occupancyRate} />,
+    },
+    {
+      key: 'craneCount', header: 'Cranes',
+      render: (b) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {b.craneCount} × {b.craneCapacity}
+        </span>
+      ),
+    },
+    {
+      key: 'id', header: '', className: 'w-[120px] text-right',
+      render: (b) => (
+        <div className="flex items-center justify-end gap-0.5" onClick={e => e.stopPropagation()}>
+          <button onClick={() => openDrawer(b)} className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors" title="View">
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => openEdit(b)} className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400 transition-colors" title="Edit">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          {b.status === 'Available' && (
+            <button onClick={() => openAllocate(b)} className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors" title="Allocate">
+              <Anchor className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button onClick={() => { setDeletingBerth(b); setDeleteOpen(true); }} className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors" title="Delete">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ),
+    },
+  ], [openEdit, openDrawer, openAllocate]);
 
   return (
     <PageWrapper
-      title="Berth Management"
-      description="Monitor berth occupancy, schedules, and real-time status across all terminals"
+      title="Berth Allocation"
+      description="Manage berth assignments, occupancy, and vessel allocation"
       actions={
-        <Button className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md hover:shadow-lg hover:from-sky-600 hover:to-indigo-600 rounded-[10px] gap-2">
-          <Dock className="w-4 h-4" />
-          Assign Berth
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchData} className="gap-1.5">
+            <RotateCcw className="w-3.5 h-3.5" /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5">
+            <Download className="w-3.5 h-3.5" /> Export CSV
+          </Button>
+          <Button size="sm" onClick={openCreate} className="gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Add Berth
+          </Button>
+        </div>
       }
     >
-      {/* ── KPI Strip ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-        <KPICard title="Total Berths" value={stats.total} icon={<Dock className="w-5 h-5" />} iconColor="cyan" />
-        <KPICard title="Occupied" value={stats.occupied} icon={<Sailboat className="w-5 h-5" />} iconColor="indigo" />
-        <KPICard title="Available" value={stats.available} icon={<CheckCircle2 className="w-5 h-5" />} iconColor="green" />
-        <KPICard title="Maintenance" value={stats.maintenance} icon={<Wrench className="w-5 h-5" />} iconColor="amber" />
-        <KPICard title="Avg Occupancy" value={`${stats.avgOccupancy}%`} icon={<GanttChartSquare className="w-5 h-5" />} iconColor="teal" trend={stats.avgOccupancy > 70 ? { value: stats.avgOccupancy, isPositive: false } : { value: 100 - stats.avgOccupancy, isPositive: true }} />
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <KPICard title="Total Berths" value={stats.total} icon={<Waves className="w-5 h-5" />} iconColor="cyan" description="All berths in port" />
+        <KPICard title="Occupied" value={stats.occupied} icon={<Ship className="w-5 h-5" />} iconColor="amber" description="Currently in use" />
+        <KPICard title="Available" value={stats.available} icon={<CheckCircle className="w-5 h-5" />} iconColor="green" description="Ready for allocation" />
+        <KPICard title="In Maintenance" value={stats.maintenance} icon={<Wrench className="w-5 h-5" />} iconColor="red" description="Out of service" />
       </div>
 
-      {/* ── Filter Bar ────────────────────────────────────────── */}
-      <div className="bg-card border border-border/60 rounded-xl p-4 mb-6 shadow-soft">
+      <div className="bg-card border border-border/60 rounded-xl p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <input
               value={search}
-              onChange={e => { setSearch(e.target.value); setLoading(true); setTimeout(() => setLoading(false), 300); }}
-              placeholder="Search berth, vessel, operator, or cargo..."
-              className="w-full h-9 pl-9 pr-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:bg-primary/5 focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.1)] transition-all duration-200"
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search berths by name, operator, or vessel..."
+              className="w-full h-10 pl-9 pr-9 bg-muted/40 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:bg-primary/5 transition-all"
             />
             {search && (
-              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[160px] h-9 bg-muted/40 border-border rounded-[9px] text-[0.84rem]">
-              <SelectValue placeholder="All Types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Types</SelectItem>
-              {berthTypes.map(t => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+            className="w-[160px] h-10 bg-muted/40 border border-border rounded-lg text-sm text-foreground outline-none focus:border-primary/50 px-3"
+          >
+            <option value="All">All Types</option>
+            {berthTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
-
-        {/* Status pills */}
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {statusPills.map(pill => {
-            const isActive = statusFilter === pill.label;
-            const meta = pill.label !== 'All' ? STATUS_META[pill.label as BerthStatus] : null;
-            return (
-              <button
-                key={pill.label}
-                onClick={() => setStatusFilter(pill.label)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.70rem] font-bold border transition-all ${
-                  isActive
-                    ? meta
-                      ? `${meta.pill} shadow-sm`
-                      : 'bg-primary/10 text-primary border-primary/30 shadow-sm'
-                    : 'bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground hover:border-border'
-                }`}
-              >
-                {meta && <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />}
-                {pill.label}
-                <span className={`text-[0.65rem] ${isActive ? 'opacity-80' : 'text-muted-foreground/60'}`}>
-                  {pill.count}
-                </span>
-              </button>
-            );
-          })}
+          {statusPills.map(pill => (
+            <button
+              key={pill.label}
+              onClick={() => setStatusFilter(pill.label)}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
+                statusFilter === pill.label && pill.label !== 'All' ? berthStatusColors[pill.label] : '',
+                statusFilter === pill.label && pill.label === 'All' ? 'bg-primary/10 text-primary border-primary/30' : '',
+                statusFilter !== pill.label ? 'bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground hover:border-border' : '',
+              )}
+            >
+              {pill.label !== 'All' && <span className={cn('w-1.5 h-1.5 rounded-full', berthStatusDot[pill.label] || 'bg-muted-foreground')} />}
+              {pill.label}
+              <span className={cn('text-[0.65rem]', statusFilter === pill.label ? 'opacity-80' : 'text-muted-foreground/60')}>{pill.count}</span>
+            </button>
+          ))}
         </div>
-
-        {(search || statusFilter !== 'All' || typeFilter !== 'All') && (
-          <p className="text-[0.72rem] text-muted-foreground mt-2.5 ml-1">
-            {filtered.length} berth(s) found
-          </p>
-        )}
       </div>
 
-      {/* ── Berth Cards ────────────────────────────────────────── */}
       {loading ? (
-        <SkeletonLoader variant="card" count={4} />
-      ) : filtered.length === 0 ? (
-        <div className="bg-card border border-border/60 rounded-xl shadow-soft py-20 flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-muted/40 border border-border/50 flex items-center justify-center">
-            <Dock className="w-7 h-7 text-muted-foreground/30" />
+        <LoadingState rows={5} message="Loading berths..." />
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <Waves className="w-8 h-8 text-red-400" />
           </div>
-          <p className="text-[0.88rem] font-semibold text-foreground">No berths found</p>
-          <p className="text-[0.78rem] text-muted-foreground">Try adjusting your search or filter criteria</p>
+          <h3 className="text-lg font-medium text-foreground">Failed to load berths</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">{error}</p>
+          <Button variant="outline" onClick={fetchData} className="gap-2"><RotateCcw className="w-4 h-4" /> Retry</Button>
         </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={<Waves className="w-8 h-8 text-muted-foreground" />}
+          title="No berths found"
+          description={search || statusFilter !== 'All' || typeFilter !== 'All' ? 'Try adjusting your search or filter' : 'No berths configured yet'}
+          action={<Button onClick={openCreate} size="sm" className="gap-1.5"><Plus className="w-3.5 h-3.5" />Add Berth</Button>}
+        />
       ) : (
-        <>
-          {/* Occupancy overview bar */}
-          <div className="flex items-center gap-4 px-4 py-2 mb-4 bg-card border border-border/60 rounded-lg shadow-soft text-[0.78rem] text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Dock className="w-3.5 h-3.5" />
-              {filtered.length} berths
-            </span>
-            <span className="w-px h-3 bg-border/50" />
-            <span className="flex items-center gap-1.5">
-              <Sailboat className="w-3.5 h-3.5" />
-              {stats.occupied} occupied
-            </span>
-            <span className="w-px h-3 bg-border/50" />
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              {stats.available} available
-            </span>
+        <DataTable<Berth>
+          data={filtered}
+          columns={columns}
+          pageSize={10}
+          pageSizeOptions={[10, 25, 50, 100]}
+          onRowClick={openDrawer}
+          emptyMessage="No berths match your criteria"
+        />
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingBerth ? 'Edit Berth' : 'Add New Berth'}</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Berth Name</Label>
+                <Input value={formData.name} onChange={e => handleFormChange('name', e.target.value)} placeholder="e.g. Berth 1A" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</Label>
+                <Select value={formData.type} onValueChange={v => handleFormChange('type', v)}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {berthTypeOptions.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Depth (m)</Label>
+                <Input type="number" value={formData.depth} onChange={e => handleFormChange('depth', Number(e.target.value))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Length (m)</Label>
+                <Input type="number" value={formData.length} onChange={e => handleFormChange('length', Number(e.target.value))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Max Draft (m)</Label>
+                <Input type="number" value={formData.maxDraft} onChange={e => handleFormChange('maxDraft', Number(e.target.value))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Max Vessel Length (m)</Label>
+                <Input type="number" value={formData.maxVesselLength} onChange={e => handleFormChange('maxVesselLength', Number(e.target.value))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Max Vessel Beam (m)</Label>
+                <Input type="number" value={formData.maxVesselBeam} onChange={e => handleFormChange('maxVesselBeam', Number(e.target.value))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crane Capacity</Label>
+                <Input value={formData.craneCapacity} onChange={e => handleFormChange('craneCapacity', e.target.value)} placeholder="e.g. 50T" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crane Count</Label>
+                <Input type="number" value={formData.craneCount} onChange={e => handleFormChange('craneCount', Number(e.target.value))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Operator</Label>
+                <Input value={formData.operator} onChange={e => handleFormChange('operator', e.target.value)} placeholder="e.g. Port Authority" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Equipment (comma separated)</Label>
+                <Input value={formData.equipment} onChange={e => handleFormChange('equipment', e.target.value)} placeholder="e.g. Gantry Crane, Forklift" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Services (comma separated)</Label>
+                <Input value={formData.services} onChange={e => handleFormChange('services', e.target.value)} placeholder="e.g. Bunkering, Fresh Water" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notes</Label>
+              <textarea
+                value={formData.notes}
+                onChange={e => handleFormChange('notes', e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:bg-primary/5 transition-all resize-none"
+                placeholder="Additional notes..."
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+              <Button onClick={handleSave} disabled={saving} className="gap-2">
+                {saving ? 'Saving...' : editingBerth ? 'Update Berth' : 'Create Berth'}
+              </Button>
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filtered.map(berth => {
-              const meta = STATUS_META[berth.status];
-              const typeMeta = TYPE_META[berth.type];
-              const TypeIcon = typeMeta.icon;
-              return (
-                <div
-                  key={berth.id}
-                  className="group bg-card border border-border/60 rounded-xl shadow-soft p-4 hover:border-primary/25 hover:shadow-[0_8px_32px_oklch(var(--primary)/0.08)] hover:-translate-y-0.5 transition-all duration-300"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-10 h-10 rounded-xl ${typeMeta.bg} border border-current/20 flex items-center justify-center shrink-0 ${typeMeta.color}`}>
-                        <TypeIcon className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-[0.88rem] font-bold text-foreground font-mono">{berth.berth}</h3>
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[0.65rem] font-bold border ${meta.pill}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
-                            {berth.status}
-                          </span>
-                        </div>
-                        <p className="text-[0.72rem] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[0.60rem] font-bold border ${typeMeta.bg} ${typeMeta.color} border-current/20`}>
-                            {berth.type}
-                          </span>
-                          {berth.operator && <span>· {berth.operator}</span>}
-                        </p>
-                      </div>
-                    </div>
+      <Dialog open={allocateOpen} onOpenChange={setAllocateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Allocate Berth</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Allocating <strong>{selectedBerth?.name}</strong> to a vessel
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vessel Name</Label>
+              <Input
+                value={allocateVesselName}
+                onChange={e => setAllocateVesselName(e.target.value)}
+                placeholder="Enter vessel name"
+                list="vessel-list"
+              />
+              <datalist id="vessel-list">
+                {vessels.filter(v => v.status !== 'Departed').map(v => (
+                  <option key={v.id} value={v.name} />
+                ))}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vessel ID (optional)</Label>
+              <Input
+                value={allocateVesselId}
+                onChange={e => setAllocateVesselId(e.target.value)}
+                placeholder="e.g. ves-001"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This will mark the berth as Occupied and set the occupancy rate to 100%.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setAllocateOpen(false)}>Cancel</Button>
+              <Button onClick={handleAllocate} disabled={!allocateVesselName} className="gap-2 bg-emerald-500 hover:bg-emerald-600 text-white">
+                <Anchor className="w-4 h-4" /> Allocate
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors duration-150">
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400 transition-colors duration-150">
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors duration-150">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+      <Drawer direction="right" open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent className="sm:max-w-lg">
+          <DrawerHeader className="border-b border-border/60">
+            <DrawerTitle className="flex items-center gap-2">
+              <Dock className="w-4 h-4 text-primary" />
+              {selectedBerth?.name || 'Berth Details'}
+            </DrawerTitle>
+          </DrawerHeader>
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {selectedBerth && (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{selectedBerth.berthId}</p>
+                    <p className="text-xs text-muted-foreground">Operator: {selectedBerth.operator}</p>
                   </div>
-
-                  {/* Occupancy bar */}
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between text-[0.65rem] text-muted-foreground mb-1">
-                      <span>Occupancy</span>
-                      <span>{berth.occupancyRate}%</span>
-                    </div>
-                    <OccupancyBar rate={berth.occupancyRate} />
-                  </div>
-
-                  {/* Vessel info (if occupied) */}
-                  {berth.vessel ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-[0.82rem] font-medium text-foreground">
-                        <Sailboat className="w-4 h-4 text-muted-foreground" />
-                        {berth.vessel}
-                        {berth.vesselClass && (
-                          <span className="text-[0.60rem] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded border border-border/30">
-                            {berth.vesselClass}
-                          </span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[0.72rem]">
-                        {berth.imo && (
-                          <div>
-                            <p className="text-muted-foreground">IMO</p>
-                            <p className="text-foreground font-mono">{berth.imo}</p>
-                          </div>
-                        )}
-                        {berth.eta && (
-                          <div>
-                            <p className="text-muted-foreground">ETA</p>
-                            <p className="text-foreground">{berth.eta}</p>
-                          </div>
-                        )}
-                        {berth.etd && (
-                          <div>
-                            <p className="text-muted-foreground">ETD</p>
-                            <p className="text-foreground">{berth.etd}</p>
-                          </div>
-                        )}
-                        {berth.containerCount && (
-                          <div>
-                            <p className="text-muted-foreground">Containers</p>
-                            <p className="text-foreground font-medium">{berth.containerCount}</p>
-                          </div>
-                        )}
-                      </div>
-                      {berth.cargoDescription && (
-                        <p className="text-[0.72rem] text-muted-foreground flex items-center gap-1.5">
-                          <Container className="w-3.5 h-3.5" />
-                          {berth.cargoDescription}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 py-2 text-[0.78rem] text-muted-foreground">
-                      {berth.status === 'Available' ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          Ready for vessel assignment
-                        </>
-                      ) : berth.status === 'Maintenance' ? (
-                        <>
-                          <Wrench className="w-4 h-4 text-amber-400" />
-                          Under maintenance — last service: {berth.lastMaintenance}
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="w-4 h-4 text-indigo-400" />
-                          Next vessel arriving {berth.eta}
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Specs footer */}
-                  <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/30 text-[0.65rem] text-muted-foreground">
-                    <span>Depth: {berth.depth}m</span>
-                    <span className="w-px h-3 bg-border/40" />
-                    <span>Length: {berth.length}m</span>
-                    <span className="w-px h-3 bg-border/40" />
-                    <span>Max Draft: {berth.maxDraft}m</span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-bold border', berthTypeColors[selectedBerth.type])}>
+                      {selectedBerth.type}
+                    </span>
+                    <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border', berthStatusColors[selectedBerth.status])}>
+                      <span className={cn('w-1.5 h-1.5 rounded-full', berthStatusDot[selectedBerth.status])} />
+                      {selectedBerth.status}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="grid grid-cols-2 gap-4 bg-muted/20 rounded-lg p-4 border border-border/40">
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Depth</p>
+                    <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.depth}m</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Length</p>
+                    <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.length}m</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Max Draft</p>
+                    <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.maxDraft}m</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Max Vessel Length</p>
+                    <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.maxVesselLength}m</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Max Vessel Beam</p>
+                    <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.maxVesselBeam}m</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Cranes</p>
+                    <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.craneCount} × {selectedBerth.craneCapacity}</p>
+                  </div>
+                  {selectedBerth.currentVessel && (
+                    <>
+                      <div>
+                        <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Current Vessel</p>
+                        <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.currentVessel}</p>
+                      </div>
+                      <div>
+                        <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Vessel ID</p>
+                        <p className="text-sm font-medium text-foreground mt-0.5">{selectedBerth.currentVesselId || '—'}</p>
+                      </div>
+                    </>
+                  )}
+                  <div className="col-span-2">
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider mb-1.5">Occupancy Rate</p>
+                    <OccupancyBar rate={selectedBerth.occupancyRate} />
+                  </div>
+                  {selectedBerth.occupancyStart && (
+                    <div>
+                      <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Occupied Since</p>
+                      <p className="text-sm font-medium text-foreground mt-0.5">{formatDate(selectedBerth.occupancyStart, 'datetime')}</p>
+                    </div>
+                  )}
+                  {selectedBerth.occupancyEnd && (
+                    <div>
+                      <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider">Released At</p>
+                      <p className="text-sm font-medium text-foreground mt-0.5">{formatDate(selectedBerth.occupancyEnd, 'datetime')}</p>
+                    </div>
+                  )}
+                </div>
+
+                {selectedBerth.equipment && selectedBerth.equipment.length > 0 && (
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider mb-2">Equipment</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedBerth.equipment.map((eq, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-medium bg-muted/40 border border-border/60 text-muted-foreground">
+                          <Drill className="w-3 h-3" /> {eq}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedBerth.services && selectedBerth.services.length > 0 && (
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider mb-2">Services</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedBerth.services.map((svc, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-medium bg-muted/40 border border-border/60 text-muted-foreground">
+                          <Wrench className="w-3 h-3" /> {svc}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedBerth.notes && (
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider mb-1">Notes</p>
+                    <p className="text-sm text-foreground bg-muted/20 rounded-lg p-3 border border-border/40">{selectedBerth.notes}</p>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-[0.65rem] font-semibold uppercase text-muted-foreground tracking-wider mb-2">Berth Actions</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedBerth.status === 'Available' && (
+                      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openAllocate(selectedBerth)}>
+                        <Anchor className="w-3.5 h-3.5" /> Allocate
+                      </Button>
+                    )}
+                    {selectedBerth.status === 'Occupied' && (
+                      <Button size="sm" variant="outline" className="gap-1.5 text-red-400 border-red-500/20 hover:bg-red-500/10" onClick={() => handleRelease(selectedBerth)}>
+                        <CheckCircle className="w-3.5 h-3.5" /> Release
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openEdit(selectedBerth)}>
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </>
-      )}
+        </DrawerContent>
+      </Drawer>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Berth</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deletingBerth?.name}</strong> ({deletingBerth?.type})? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingBerth(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600 text-white">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageWrapper>
   );
 }

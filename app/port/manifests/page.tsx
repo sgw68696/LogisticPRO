@@ -1,248 +1,480 @@
 'use client';
-
-import { useMemo, useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { portService } from '@/services/port/portService';
+import type { PortManifest, ManifestStatus } from '@/types/port';
 import { PageWrapper } from '@/components/layout/PageWrapper';
+import type { Column } from '@/components/shared/DataTable';
+import { DataTable } from '@/components/shared/DataTable';
 import { KPICard } from '@/components/shared/KPICard';
-import { SkeletonLoader } from '@/components/shared/SkeletonLoader';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
-  FileText, Search, Package, CheckCircle2, AlertTriangle, Clock,
-  Eye, Edit, Trash2, X, Ship, Download, Upload, Printer, Shield,
-  Anchor, Dock, ArrowRight, MapPin, CalendarDays, Layers,
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '@/components/ui/drawer';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { cn, formatDate } from '@/lib/utils';
+import { exportToCSV } from '@/lib/export-utils';
+import { toast } from 'sonner';
+import { FileText, FileCheck, FileX, Clock, AlertTriangle, Search, X, RotateCcw, Plus, Eye, Pencil, Trash2, Download, ArrowUpDown, Ship, Anchor, Box, Shield, Weight, FileSpreadsheet, History, Archive } from 'lucide-react';
 
-type ManifestStatus = 'Filed' | 'Pending' | 'Amended' | 'Approved' | 'Rejected';
-type DeclarationType = 'Import' | 'Export' | 'Transshipment';
-
-interface ManifestItem {
-  id: string;
-  manifest: string;
-  vessel: string;
-  voyage: string;
-  type: DeclarationType;
-  origin: string;
-  destination: string;
-  eta: string;
-  containers: number;
-  totalWeight: string;
-  status: ManifestStatus;
-  filedDate: string;
-  filedBy: string;
-  customsRef: string;
-  hazmatCount: number;
-  reeferCount: number;
-  notes: string;
-}
-
-const STATUS_META: Record<ManifestStatus, { pill: string; dot: string }> = {
-  Filed: { pill: 'bg-blue-500/10 text-blue-400 border-blue-500/20', dot: 'bg-blue-400' },
-  Pending: { pill: 'bg-amber-500/10 text-amber-400 border-amber-500/20', dot: 'bg-amber-400' },
-  Amended: { pill: 'bg-violet-500/10 text-violet-400 border-violet-500/20', dot: 'bg-violet-400' },
-  Approved: { pill: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-400' },
-  Rejected: { pill: 'bg-destructive/10 text-destructive border-destructive/20', dot: 'bg-destructive' },
+const manifestTypeColors: Record<string, string> = {
+  Import: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Export: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Transshipment: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
 };
 
-const manifests: ManifestItem[] = [
-  { id: 'MFT-001', manifest: 'MFT-2026-0421', vessel: 'CMA CGM ALTAMIRA', voyage: 'CNYTN-ALT-2026', type: 'Import', origin: 'Yantian, CN', destination: 'Le Havre, FR', eta: '13 May 08:15', containers: 34, totalWeight: '421,600 kg', status: 'Approved', filedDate: '10 May 2026', filedBy: 'Jean Dupont', customsRef: 'CUS-2026-8841', hazmatCount: 2, reeferCount: 4, notes: 'All docs verified' },
-  { id: 'MFT-002', manifest: 'MFT-2026-0422', vessel: 'MAERSK GUJARAT', voyage: 'INMUM-SGSIN-2026', type: 'Export', origin: 'Mumbai, IN', destination: 'Singapore, SG', eta: '14 May 14:00', containers: 52, totalWeight: '678,300 kg', status: 'Filed', filedDate: '11 May 2026', filedBy: 'Rajesh Kumar', customsRef: 'CUS-2026-8842', hazmatCount: 5, reeferCount: 8, notes: 'Bonded cargo' },
-  { id: 'MFT-003', manifest: 'MFT-2026-0423', vessel: 'MSC ZOE', voyage: 'LKCMB-JPTYO-2026', type: 'Transshipment', origin: 'Colombo, LK', destination: 'Tokyo, JP', eta: '13 May 22:45', containers: 18, totalWeight: '234,500 kg', status: 'Pending', filedDate: '12 May 2026', filedBy: 'Chen Wei', customsRef: 'CUS-2026-8843', hazmatCount: 0, reeferCount: 6, notes: 'Transship to JPSAK' },
-  { id: 'MFT-004', manifest: 'MFT-2026-0424', vessel: 'OOCL HONG KONG', voyage: 'SGSIN-INNSA-2026', type: 'Import', origin: 'Singapore, SG', destination: 'Mumbai, IN', eta: '15 May 06:10', containers: 28, totalWeight: '367,200 kg', status: 'Pending', filedDate: '12 May 2026', filedBy: 'Li Ming', customsRef: 'CUS-2026-8844', hazmatCount: 1, reeferCount: 3, notes: 'Awaiting hazmat docs' },
-  { id: 'MFT-005', manifest: 'MFT-2026-0425', vessel: 'EVERGREEN LOTUS', voyage: 'NLRTM-CNSHA-2026', type: 'Export', origin: 'Rotterdam, NL', destination: 'Shanghai, CN', eta: '15 May 14:30', containers: 45, totalWeight: '589,100 kg', status: 'Filed', filedDate: '13 May 2026', filedBy: 'Pieter van den Berg', customsRef: 'CUS-2026-8845', hazmatCount: 3, reeferCount: 7, notes: 'DG cargo class 3' },
-  { id: 'MFT-006', manifest: 'MFT-2026-0426', vessel: 'COSCO PRIDE', voyage: 'CNSHA-USLAX-2026', type: 'Export', origin: 'Shanghai, CN', destination: 'Los Angeles, US', eta: '12 May 09:00', containers: 67, totalWeight: '874,500 kg', status: 'Approved', filedDate: '08 May 2026', filedBy: 'Zhang Wei', customsRef: 'CUS-2026-8846', hazmatCount: 8, reeferCount: 12, notes: 'Cleared for departure' },
-  { id: 'MFT-007', manifest: 'MFT-2026-0427', vessel: 'MSC AURORA', voyage: 'DEHAM-CNSHA-2026', type: 'Import', origin: 'Hamburg, DE', destination: 'Shanghai, CN', eta: '16 May 11:20', containers: 31, totalWeight: '403,800 kg', status: 'Amended', filedDate: '09 May 2026', filedBy: 'Klaus Schmidt', customsRef: 'CUS-2026-8847', hazmatCount: 4, reeferCount: 5, notes: 'Amendment: added 2 containers' },
-  { id: 'MFT-008', manifest: 'MFT-2026-0428', vessel: 'ONE APUS', voyage: 'USLAX-JPTYO-2026', type: 'Transshipment', origin: 'Los Angeles, US', destination: 'Tokyo, JP', eta: '14 May 07:45', containers: 22, totalWeight: '289,600 kg', status: 'Approved', filedDate: '10 May 2026', filedBy: 'Yuki Tanaka', customsRef: 'CUS-2026-8848', hazmatCount: 0, reeferCount: 2, notes: 'Transship to JPYOK' },
-];
+const manifestStatusColors: Record<string, string> = {
+  Draft: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  Filed: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Approved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Amended: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
+  Archived: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+};
+
+const manifestTypes = ['Import', 'Export', 'Transshipment'] as const;
+const manifestStatuses: ManifestStatus[] = ['Draft', 'Filed', 'Approved', 'Amended', 'Rejected', 'Archived'];
+
+const statusTransitions: Record<string, ManifestStatus[]> = {
+  Draft: ['Filed'],
+  Filed: ['Approved', 'Rejected', 'Amended'],
+  Approved: ['Amended', 'Archived'],
+  Amended: ['Filed', 'Archived'],
+  Rejected: ['Draft', 'Archived'],
+  Archived: [],
+};
+
+function ManifestStatusBadge({ status }: { status: string }) {
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border', manifestStatusColors[status] || 'bg-gray-500/10 text-gray-400 border-gray-500/20')}>
+      {status}
+    </span>
+  );
+}
+
+function ManifestTypeBadge({ type }: { type: string }) {
+  return (
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-bold border', manifestTypeColors[type] || '')}>
+      {type}
+    </span>
+  );
+}
+
+function StatusPill({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={cn(
+      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.70rem] font-bold border transition-all',
+      active && label === 'All' ? 'bg-primary/10 text-primary border-primary/30 shadow-sm' : '',
+      active && label !== 'All' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-sm' : '',
+      !active ? 'bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground hover:border-border' : ''
+    )}>
+      {label} <span className={cn('text-[0.65rem]', active ? 'opacity-80' : 'text-muted-foreground/60')}>{count}</span>
+    </button>
+  );
+}
+
+interface ManifestFormData {
+  type: string; vessel: string; voyage: string; carrier: string;
+  portOfLoading: string; portOfDischarge: string; filedBy: string; notes: string;
+}
+
+const defaultForm: ManifestFormData = {
+  type: 'Import', vessel: '', voyage: '', carrier: '',
+  portOfLoading: '', portOfDischarge: '', filedBy: '', notes: '',
+};
 
 export default function ManifestsPage() {
+  const [data, setData] = useState<PortManifest[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
-  const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingManifest, setEditingManifest] = useState<PortManifest | null>(null);
+  const [form, setForm] = useState<ManifestFormData>(defaultForm);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedManifest, setSelectedManifest] = useState<PortManifest | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingManifest, setDeletingManifest] = useState<PortManifest | null>(null);
 
-  const filtered = useMemo(() => {
-    let result = [...manifests];
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(m =>
-        m.manifest.toLowerCase().includes(q) ||
-        m.vessel.toLowerCase().includes(q) ||
-        m.customsRef.toLowerCase().includes(q) ||
-        m.filedBy.toLowerCase().includes(q)
-      );
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await portService.listManifests({
+        search: search || undefined,
+        type: typeFilter !== 'All' ? typeFilter : undefined,
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+      });
+      setData(result);
+    } catch {
+      toast.error('Failed to load manifests');
+    } finally {
+      setLoading(false);
     }
-    if (statusFilter !== 'All') result = result.filter(m => m.status === statusFilter);
-    if (typeFilter !== 'All') result = result.filter(m => m.type === typeFilter);
-    return result;
-  }, [search, statusFilter, typeFilter]);
+  }, [search, typeFilter, statusFilter]);
 
-  const stats = useMemo(() => ({
-    total: manifests.length,
-    approved: manifests.filter(m => m.status === 'Approved').length,
-    pending: manifests.filter(m => m.status === 'Pending').length,
-    filed: manifests.filter(m => m.status === 'Filed').length,
-    totalContainers: manifests.reduce((s, m) => s + m.containers, 0),
-    hazmatTotal: manifests.reduce((s, m) => s + m.hazmatCount, 0),
-  }), []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const statusPills = [
-    { label: 'All', count: manifests.length },
-    { label: 'Approved', count: stats.approved },
-    { label: 'Filed', count: stats.filed },
-    { label: 'Pending', count: stats.pending },
+  const stats = useMemo(() => {
+    const total = data.length;
+    const approved = data.filter(m => m.status === 'Approved').length;
+    const filed = data.filter(m => m.status === 'Filed').length;
+    const pending = data.filter(m => m.status === 'Draft' || m.status === 'Amended').length;
+    const hazmat = data.reduce((s, m) => s + m.hazmatCount, 0);
+    return { total, approved, filed, pending, hazmat };
+  }, [data]);
+
+  const statusPills = useMemo(() => {
+    const counts: Record<string, number> = { All: data.length };
+    data.forEach(m => { counts[m.status] = (counts[m.status] || 0) + 1; });
+    return ['All', ...manifestStatuses].map(l => ({ label: l, count: counts[l] || 0 }));
+  }, [data]);
+
+  const openCreate = () => {
+    setEditingManifest(null);
+    setForm(defaultForm);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (m: PortManifest) => {
+    setEditingManifest(m);
+    setForm({
+      type: m.type, vessel: m.vessel, voyage: m.voyage, carrier: m.carrier,
+      portOfLoading: m.portOfLoading, portOfDischarge: m.portOfDischarge,
+      filedBy: m.filedBy, notes: m.notes,
+    });
+    setDialogOpen(true);
+  };
+
+  const openDetail = (m: PortManifest) => {
+    setSelectedManifest(m);
+    setDrawerOpen(true);
+  };
+
+  const openDelete = (m: PortManifest) => {
+    setDeletingManifest(m);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.vessel.trim()) { toast.error('Vessel name is required'); return; }
+    try {
+      if (editingManifest) {
+        const idx = await portService.updateManifest(editingManifest.id, {
+          type: form.type as PortManifest['type'],
+          vessel: form.vessel, voyage: form.voyage, carrier: form.carrier,
+          portOfLoading: form.portOfLoading, portOfDischarge: form.portOfDischarge,
+          filedBy: form.filedBy, notes: form.notes,
+        });
+        toast.success('Manifest updated');
+      } else {
+        await portService.createManifest({
+          type: form.type as PortManifest['type'],
+          vessel: form.vessel, voyage: form.voyage, carrier: form.carrier,
+          portOfLoading: form.portOfLoading, portOfDischarge: form.portOfDischarge,
+          filedBy: form.filedBy, notes: form.notes,
+        });
+        toast.success('Manifest created');
+      }
+      setDialogOpen(false);
+      fetchData();
+    } catch { toast.error('Failed to save manifest'); }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingManifest) return;
+    try {
+      await portService.deleteManifest(deletingManifest.id);
+      toast.success('Manifest deleted');
+      setDeleteDialogOpen(false);
+      setDeletingManifest(null);
+      fetchData();
+    } catch { toast.error('Failed to delete manifest'); }
+  };
+
+  const updateStatus = async (manifest: PortManifest, newStatus: ManifestStatus) => {
+    try {
+      await portService.updateManifest(manifest.id, { status: newStatus });
+      toast.success(`Status updated to ${newStatus}`);
+      fetchData();
+    } catch { toast.error('Failed to update status'); }
+  };
+
+  const handleExport = () => {
+    const exportData = data.map(m => ({
+      manifestId: m.manifestId, type: m.type, status: m.status,
+      vessel: m.vessel, voyage: m.voyage, carrier: m.carrier,
+      portOfLoading: m.portOfLoading, portOfDischarge: m.portOfDischarge,
+      containerCount: m.containerCount, totalWeight: m.totalWeight,
+      hazmatCount: m.hazmatCount, reeferCount: m.reeferCount,
+      customsReference: m.customsReference, filedBy: m.filedBy,
+    }));
+    exportToCSV(exportData, `manifests-${new Date().toISOString().slice(0, 10)}`, [
+      { key: 'manifestId', label: 'Manifest ID' },
+      { key: 'type', label: 'Type' },
+      { key: 'status', label: 'Status' },
+      { key: 'vessel', label: 'Vessel' },
+      { key: 'voyage', label: 'Voyage' },
+      { key: 'carrier', label: 'Carrier' },
+      { key: 'portOfLoading', label: 'Port of Loading' },
+      { key: 'portOfDischarge', label: 'Port of Discharge' },
+      { key: 'containerCount', label: 'Container Count' },
+      { key: 'totalWeight', label: 'Total Weight' },
+      { key: 'hazmatCount', label: 'Hazmat Count' },
+      { key: 'reeferCount', label: 'Reefer Count' },
+      { key: 'customsReference', label: 'Customs Reference' },
+      { key: 'filedBy', label: 'Filed By' },
+    ]);
+    toast.success('Manifests exported to CSV');
+  };
+
+  const columns: Column<PortManifest>[] = [
+    {
+      key: 'manifestId', header: 'Manifest#', sortable: true,
+      render: (m) => <span className="font-mono font-bold text-[0.80rem]">{m.manifestId}</span>,
+    },
+    {
+      key: 'type', header: 'Type', sortable: true,
+      render: (m) => <ManifestTypeBadge type={m.type} />,
+    },
+    {
+      key: 'vessel', header: 'Vessel / Voyage', sortable: true,
+      render: (m) => (
+        <div><p className="text-[0.80rem] font-medium">{m.vessel}</p><p className="text-[0.68rem] font-mono text-muted-foreground">{m.voyage}</p></div>
+      ),
+    },
+    {
+      key: 'route', header: 'Route',
+      render: (m) => (
+        <div className="flex items-center gap-1 text-[0.78rem]">
+          <span className="font-medium">{m.portOfLoading.split(',')[0]}</span>
+          <span className="text-muted-foreground">→</span>
+          <span className="font-medium">{m.portOfDischarge.split(',')[0]}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'status', header: 'Status', sortable: true,
+      render: (m) => <ManifestStatusBadge status={m.status} />,
+    },
+    {
+      key: 'containerCount', header: 'Containers', sortable: true,
+      render: (m) => <span className="tabular-nums text-[0.80rem]">{m.containerCount} ctr</span>,
+    },
+    {
+      key: 'totalWeight', header: 'Weight', sortable: true,
+      render: (m) => <span className="tabular-nums text-[0.80rem]">{(m.totalWeight / 1000).toFixed(1)}t</span>,
+    },
+    {
+      key: 'specialCargo', header: 'Haz/Reefer',
+      render: (m) => (
+        <div className="flex items-center gap-1.5">
+          {m.hazmatCount > 0 && <Badge variant="outline" className="gap-1 text-[0.60rem] px-1.5 py-0 border-red-500/20 bg-red-500/10 text-red-400"><AlertTriangle className="w-3 h-3" />{m.hazmatCount}</Badge>}
+          {m.reeferCount > 0 && <Badge variant="outline" className="gap-1 text-[0.60rem] px-1.5 py-0 border-blue-500/20 bg-blue-500/10 text-blue-400"><Shield className="w-3 h-3" />{m.reeferCount}</Badge>}
+        </div>
+      ),
+    },
+    {
+      key: 'filedDate', header: 'Filed By / Date', sortable: true,
+      render: (m) => (
+        <div><p className="text-[0.80rem]">{m.filedBy}</p><p className="text-[0.68rem] text-muted-foreground">{formatDate(m.filedDate)}</p></div>
+      ),
+    },
+    {
+      key: 'actions', header: '', className: 'w-[140px]',
+      render: (m) => (
+        <div className="flex items-center gap-0.5">
+          <button onClick={(e) => { e.stopPropagation(); openDetail(m); }} className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"><Eye className="w-3.5 h-3.5" /></button>
+          <button onClick={(e) => { e.stopPropagation(); openEdit(m); }} className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+          <button onClick={(e) => { e.stopPropagation(); openDelete(m); }} className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+        </div>
+      ),
+    },
   ];
 
   return (
     <PageWrapper
-      title="Cargo Manifest"
-      description="Manage cargo declarations, customs documentation, and shipment manifests for all vessels"
+      title="Cargo Manifests"
+      description="Import, export and transshipment cargo manifests"
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2 rounded-[9px]"><Upload className="w-4 h-4" />Import</Button>
-          <Button className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md hover:shadow-lg hover:from-sky-600 hover:to-indigo-600 rounded-[10px] gap-2">
-            <FileText className="w-4 h-4" />Create Manifest
-          </Button>
+          <Button variant="outline" onClick={handleExport} className="gap-2 rounded-[9px]"><Download className="w-4 h-4" />Export CSV</Button>
+          <Button onClick={openCreate} className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md hover:shadow-lg hover:from-sky-600 hover:to-indigo-600 rounded-[10px] gap-2"><Plus className="w-4 h-4" />Create Manifest</Button>
         </div>
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         <KPICard title="Total Manifests" value={stats.total} icon={<FileText className="w-5 h-5" />} iconColor="cyan" />
-        <KPICard title="Approved" value={stats.approved} icon={<CheckCircle2 className="w-5 h-5" />} iconColor="green" />
-        <KPICard title="Filed" value={stats.filed} icon={<FileText className="w-5 h-5" />} iconColor="blue" />
+        <KPICard title="Approved" value={stats.approved} icon={<FileCheck className="w-5 h-5" />} iconColor="green" />
+        <KPICard title="Filed" value={stats.filed} icon={<FileText className="w-5 h-5" />} iconColor="indigo" />
         <KPICard title="Pending" value={stats.pending} icon={<Clock className="w-5 h-5" />} iconColor="amber" />
-        <KPICard title="Hazmat Shipments" value={stats.hazmatTotal} icon={<AlertTriangle className="w-5 h-5" />} iconColor="red" trend={stats.hazmatTotal > 0 ? { value: stats.hazmatTotal, isPositive: false } : undefined} />
+        <KPICard title="Hazmat Shipments" value={stats.hazmat} icon={<AlertTriangle className="w-5 h-5" />} iconColor="red" />
       </div>
 
       <div className="bg-card border border-border/60 rounded-xl p-4 mb-6 shadow-soft">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input value={search} onChange={e => { setSearch(e.target.value); setLoading(true); setTimeout(() => setLoading(false), 300); }} placeholder="Search manifest, vessel, customs ref..." className="w-full h-9 pl-9 pr-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:bg-primary/5 focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.1)] transition-all duration-200" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search manifest, vessel, voyage, carrier, or customs ref..." className="w-full h-9 pl-9 pr-8 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:bg-primary/5 focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.1)] transition-all duration-200" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>}
           </div>
-          <Select value={typeFilter} onValueChange={t => setTypeFilter(t)}>
-            <SelectTrigger className="w-[160px] h-9 bg-muted/40 border-border rounded-[9px] text-[0.84rem]"><SelectValue placeholder="Declaration Type" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Types</SelectItem>
-              <SelectItem value="Import">Import</SelectItem>
-              <SelectItem value="Export">Export</SelectItem>
-              <SelectItem value="Transshipment">Transshipment</SelectItem>
-            </SelectContent>
-          </Select>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="h-9 px-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground outline-none focus:border-primary/50">
+            <option value="All">All Types</option>
+            {manifestTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {statusPills.map(pill => {
-            const isActive = statusFilter === pill.label;
-            const meta = pill.label !== 'All' ? STATUS_META[pill.label as ManifestStatus] : null;
-            return (
-              <button key={pill.label} onClick={() => setStatusFilter(pill.label)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.70rem] font-bold border transition-all ${isActive ? meta ? `${meta.pill} shadow-sm` : 'bg-primary/10 text-primary border-primary/30 shadow-sm' : 'bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground hover:border-border'}`}>
-                {meta && <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />}
-                {pill.label} <span className="text-[0.65rem] opacity-60">{pill.count}</span>
-              </button>
-            );
-          })}
+          {statusPills.map(pill => (
+            <StatusPill key={pill.label} label={pill.label} count={pill.count} active={statusFilter === pill.label} onClick={() => setStatusFilter(pill.label)} />
+          ))}
         </div>
-        {(search || statusFilter !== 'All' || typeFilter !== 'All') && (
-          <p className="text-[0.72rem] text-muted-foreground mt-2.5 ml-1">{filtered.length} manifest(s) found</p>
-        )}
       </div>
 
-      {loading ? <SkeletonLoader variant="card" count={4} /> : filtered.length === 0 ? (
-        <div className="bg-card border border-border/60 rounded-xl shadow-soft py-20 flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-muted/40 border border-border/50 flex items-center justify-center"><FileText className="w-7 h-7 text-muted-foreground/30" /></div>
-          <p className="text-[0.88rem] font-semibold text-foreground">No manifests found</p>
-          <p className="text-[0.78rem] text-muted-foreground">Try adjusting your search or filter criteria</p>
-        </div>
+      {loading ? (
+        <LoadingState rows={6} message="Loading manifests..." />
+      ) : data.length === 0 ? (
+        <EmptyState icon={<FileText className="w-8 h-8" />} title="No manifests found" description={search || typeFilter !== 'All' || statusFilter !== 'All' ? 'Try adjusting your search or filter criteria' : 'No manifests available'} action={<Button variant="outline" className="gap-2 rounded-[9px]" onClick={() => { setSearch(''); setTypeFilter('All'); setStatusFilter('All'); }}><RotateCcw className="w-4 h-4" />Reset Filters</Button>} />
       ) : (
-        <>
-          <div className="flex items-center gap-4 px-4 py-2 mb-4 bg-card border border-border/60 rounded-lg shadow-soft text-[0.78rem] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" />{filtered.length} manifests</span>
-            <span className="w-px h-3 bg-border/50" />
-            <span className="flex items-center gap-1.5"><Package className="w-3.5 h-3.5" />{filtered.reduce((s, m) => s + m.containers, 0)} containers</span>
-          </div>
-          <div className="space-y-3">
-            {filtered.map(manifest => {
-              const meta = STATUS_META[manifest.status];
-              return (
-                <div key={manifest.id} className="group bg-card border border-border/60 rounded-xl shadow-soft p-4 hover:border-primary/25 hover:shadow-[0_8px_32px_oklch(var(--primary)/0.08)] hover:-translate-y-0.5 transition-all duration-300">
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/20 flex items-center justify-center shrink-0">
-                            <FileText className="w-5 h-5 text-amber-400" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-[0.88rem] font-semibold text-foreground font-mono">{manifest.manifest}</h3>
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[0.65rem] font-bold border ${meta.pill}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />{manifest.status}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-0.5 text-[0.72rem] text-muted-foreground">
-                              <span>{manifest.vessel}</span>
-                              <span className="w-px h-3 bg-border/40" />
-                              <span className="font-mono">{manifest.voyage}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className={`text-[0.65rem] font-bold px-2 py-0.5 ${
-                          manifest.type === 'Import' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                          manifest.type === 'Export' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
-                          'bg-violet-500/10 text-violet-400 border-violet-500/20'
-                        }`}>{manifest.type}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Route</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-muted-foreground" />
-                            {manifest.origin.split(',')[0]}
-                            <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                            {manifest.destination.split(',')[0]}
-                          </p>
-                          <p className="text-[0.70rem] text-muted-foreground">ETA: {manifest.eta}</p>
-                        </div>
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Containers</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5">{manifest.containers} units</p>
-                          <p className="text-[0.70rem] text-muted-foreground">{manifest.totalWeight}</p>
-                        </div>
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Filed</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5">{manifest.filedDate}</p>
-                          <p className="text-[0.70rem] text-muted-foreground">by {manifest.filedBy}</p>
-                        </div>
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Special Cargo</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5">
-                            <span className="text-destructive">{manifest.hazmatCount} Hazmat</span>
-                            <span className="text-muted-foreground mx-1">|</span>
-                            <span className="text-sky-400">{manifest.reeferCount} Reefer</span>
-                          </p>
-                          <p className="text-[0.70rem] text-muted-foreground font-mono">{manifest.customsRef}</p>
-                        </div>
-                      </div>
-                      {manifest.notes && (
-                        <p className="text-[0.72rem] text-muted-foreground mt-2 italic">{manifest.notes}</p>
-                      )}
-                    </div>
-                    <div className="flex lg:flex-col items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary"><Eye className="w-3.5 h-3.5" /></button>
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400"><Download className="w-3.5 h-3.5" /></button>
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
+        <DataTable<PortManifest> data={data} columns={columns} pageSize={10} emptyMessage="No manifests match your criteria" />
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingManifest ? 'Edit Manifest' : 'Create New Manifest'}</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v }))}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>{manifestTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Vessel</Label>
+                <Input value={form.vessel} onChange={e => setForm(p => ({ ...p, vessel: e.target.value }))} placeholder="Vessel name" />
+              </div>
+              <div className="space-y-2">
+                <Label>Voyage</Label>
+                <Input value={form.voyage} onChange={e => setForm(p => ({ ...p, voyage: e.target.value }))} placeholder="e.g. CNYTN-ALT-2026" />
+              </div>
+              <div className="space-y-2">
+                <Label>Carrier</Label>
+                <Input value={form.carrier} onChange={e => setForm(p => ({ ...p, carrier: e.target.value }))} placeholder="Carrier name" />
+              </div>
+              <div className="space-y-2">
+                <Label>Port of Loading</Label>
+                <Input value={form.portOfLoading} onChange={e => setForm(p => ({ ...p, portOfLoading: e.target.value }))} placeholder="e.g. Shanghai, CN" />
+              </div>
+              <div className="space-y-2">
+                <Label>Port of Discharge</Label>
+                <Input value={form.portOfDischarge} onChange={e => setForm(p => ({ ...p, portOfDischarge: e.target.value }))} placeholder="e.g. Hamburg, DE" />
+              </div>
+              <div className="space-y-2">
+                <Label>Filed By</Label>
+                <Input value={form.filedBy} onChange={e => setForm(p => ({ ...p, filedBy: e.target.value }))} placeholder="Name of filer" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Additional notes..." />
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleSave}>{editingManifest ? 'Update Manifest' : 'Create Manifest'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent className="sm:max-w-lg">
+          <DrawerHeader>
+            <DrawerTitle>Manifest Details</DrawerTitle>
+          </DrawerHeader>
+          {selectedManifest && (
+            <div className="px-6 pb-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 rounded-xl">
+                <div><Label className="text-[0.70rem] text-muted-foreground">Manifest ID</Label><p className="font-mono font-bold text-sm">{selectedManifest.manifestId}</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Type</Label><ManifestTypeBadge type={selectedManifest.type} /></div>
+                <div className="col-span-2"><Label className="text-[0.70rem] text-muted-foreground">Vessel</Label><p className="font-medium">{selectedManifest.vessel}</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Voyage</Label><p className="font-mono text-sm">{selectedManifest.voyage}</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Carrier</Label><p>{selectedManifest.carrier}</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Route</Label><p>{selectedManifest.portOfLoading} → {selectedManifest.portOfDischarge}</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Status</Label><ManifestStatusBadge status={selectedManifest.status} /></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Containers</Label><p className="tabular-nums">{selectedManifest.containerCount} units</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Total Weight</Label><p className="tabular-nums">{selectedManifest.totalWeight.toLocaleString()} {selectedManifest.weightUnit}</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Hazmat</Label><p>{selectedManifest.hazmatCount} shipments</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Reefer</Label><p>{selectedManifest.reeferCount} containers</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Filed By</Label><p>{selectedManifest.filedBy}</p></div>
+                <div><Label className="text-[0.70rem] text-muted-foreground">Filed Date</Label><p>{formatDate(selectedManifest.filedDate, 'datetime')}</p></div>
+                {selectedManifest.approvedDate && <div><Label className="text-[0.70rem] text-muted-foreground">Approved Date</Label><p>{formatDate(selectedManifest.approvedDate, 'datetime')}</p></div>}
+                <div className="col-span-2"><Label className="text-[0.70rem] text-muted-foreground">Customs Reference</Label><p className="font-mono text-sm">{selectedManifest.customsReference || '—'}</p></div>
+              </div>
+
+              {selectedManifest.notes && (
+                <div><h4 className="text-sm font-semibold mb-2">Notes</h4><p className="text-sm text-muted-foreground">{selectedManifest.notes}</p></div>
+              )}
+
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Containers ({selectedManifest.containers.length})</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedManifest.containers.map(cid => (
+                    <Badge key={cid} variant="outline" className="font-mono text-[0.65rem]">{cid}</Badge>
+                  ))}
+                  {selectedManifest.containers.length === 0 && <p className="text-sm text-muted-foreground">No containers listed</p>}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Shipments ({selectedManifest.shipmentIds.length})</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedManifest.shipmentIds.map(sid => (
+                    <Badge key={sid} variant="outline" className="font-mono text-[0.65rem]">{sid}</Badge>
+                  ))}
+                  {selectedManifest.shipmentIds.length === 0 && <p className="text-sm text-muted-foreground">No shipments linked</p>}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Status Transitions</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {(statusTransitions[selectedManifest.status] || []).map(nextStatus => (
+                    <Button key={nextStatus} size="sm" variant="outline" className="text-[0.70rem] h-7 gap-1" onClick={() => { updateStatus(selectedManifest, nextStatus); setSelectedManifest(prev => prev ? { ...prev, status: nextStatus } : prev); }}>
+                      <ArrowUpDown className="w-3 h-3" />{nextStatus}
+                    </Button>
+                  ))}
+                  {selectedManifest.status !== 'Archived' && (
+                    <Button size="sm" variant="outline" className="text-[0.70rem] h-7 gap-1 text-purple-400 border-purple-500/20 hover:bg-purple-500/10" onClick={() => { updateStatus(selectedManifest, 'Archived'); setSelectedManifest(prev => prev ? { ...prev, status: 'Archived' } : prev); }}>
+                      <Archive className="w-3 h-3" />Archive
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Manifest</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete manifest {deletingManifest?.manifestId}? This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageWrapper>
   );
 }

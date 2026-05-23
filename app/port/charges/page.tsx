@@ -1,246 +1,476 @@
 'use client';
-
-import { useMemo, useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { portService } from '@/services/port/portService';
+import type { PortCharge, ChargeCategory, ChargeStatus } from '@/types/port';
 import { PageWrapper } from '@/components/layout/PageWrapper';
+import { DataTable, Column } from '@/components/shared/DataTable';
 import { KPICard } from '@/components/shared/KPICard';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { SkeletonLoader } from '@/components/shared/SkeletonLoader';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
-  DollarSign, Search, FileText, CheckCircle2, AlertTriangle, Clock,
-  Eye, Edit, Trash2, X, Ship, Download, Printer, CalendarDays,
-  ArrowRight, User, CreditCard, Receipt, Percent,
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '@/components/ui/drawer';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn, formatDate } from '@/lib/utils';
+import { exportToCSV } from '@/lib/export-utils';
+import { toast } from 'sonner';
+import { Receipt, DollarSign, Clock, CheckCircle, AlertTriangle, Ban, Search, X, RotateCcw, Plus, Eye, Pencil, Trash2, Download, ArrowUpDown, FileText, Ship, CalendarDays, Building2, CreditCard, TrendingUp } from 'lucide-react';
 
-type ChargeStatus = 'Paid' | 'Pending' | 'Overdue' | 'Disputed' | 'Waived';
-type ChargeCategory = 'Berthage' | 'Wharfage' | 'Pilotage' | 'Towage' | 'Mooring' | 'Storage' | 'Handling' | 'Customs' | 'Security' | 'Other';
+const chargeStatusColors: Record<string, string> = {
+  Pending: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Collected: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Overdue: 'bg-red-500/10 text-red-400 border-red-500/20',
+  Disputed: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  Waived: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+};
 
-interface PortCharge {
-  id: string;
-  invoice: string;
-  vessel: string;
-  voyage: string;
-  category: ChargeCategory;
-  description: string;
-  amount: number;
-  currency: string;
-  status: ChargeStatus;
-  issuedDate: string;
-  dueDate: string;
-  paidDate: string | null;
-  payer: string;
-  refNo: string;
-  quantity: string;
-  unitRate: string;
+const chargeCategoryColors: Record<string, string> = {
+  'Berth Hire': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Pilotage: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  Towage: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  Mooring: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  'Cargo Handling': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Storage: 'bg-green-500/10 text-green-400 border-green-500/20',
+  Demurrage: 'bg-red-500/10 text-red-400 border-red-500/20',
+  Customs: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  Documentation: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  Security: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  Environmental: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Other: 'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/20',
+};
+
+const chargeCategories: ChargeCategory[] = ['Berth Hire', 'Pilotage', 'Towage', 'Mooring', 'Cargo Handling', 'Storage', 'Demurrage', 'Customs', 'Documentation', 'Security', 'Environmental', 'Other'];
+const statusOptions: ChargeStatus[] = ['Pending', 'Collected', 'Overdue', 'Disputed', 'Waived'];
+const currencies = ['USD', 'EUR', 'INR', 'SGD'] as const;
+
+const emptyCharge: Partial<PortCharge> = {
+  type: 'Berth Hire',
+  status: 'Pending',
+  vessel: '',
+  vesselId: '',
+  voyage: '',
+  description: '',
+  payer: '',
+  quantity: 1,
+  rate: 0,
+  currency: 'USD',
+  amount: 0,
+  issuedDate: new Date().toISOString().split('T')[0],
+  dueDate: '',
+  notes: '',
+};
+
+function formatCurrency(amount: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
 }
 
-const STATUS_META: Record<ChargeStatus, { pill: string; dot: string }> = {
-  Paid: { pill: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-400' },
-  Pending: { pill: 'bg-amber-500/10 text-amber-400 border-amber-500/20', dot: 'bg-amber-400' },
-  Overdue: { pill: 'bg-destructive/10 text-destructive border-destructive/20', dot: 'bg-destructive' },
-  Disputed: { pill: 'bg-red-500/10 text-red-400 border-red-500/20', dot: 'bg-red-400' },
-  Waived: { pill: 'bg-muted/50 text-muted-foreground border-border/40', dot: 'bg-muted-foreground' },
-};
-
-const CATEGORY_META: Record<ChargeCategory, { bg: string; color: string }> = {
-  Berthage: { bg: 'bg-blue-500/10', color: 'text-blue-400' },
-  Wharfage: { bg: 'bg-indigo-500/10', color: 'text-indigo-400' },
-  Pilotage: { bg: 'bg-cyan-500/10', color: 'text-cyan-400' },
-  Towage: { bg: 'bg-amber-500/10', color: 'text-amber-400' },
-  Mooring: { bg: 'bg-emerald-500/10', color: 'text-emerald-400' },
-  Storage: { bg: 'bg-violet-500/10', color: 'text-violet-400' },
-  Handling: { bg: 'bg-sky-500/10', color: 'text-sky-400' },
-  Customs: { bg: 'bg-rose-500/10', color: 'text-rose-400' },
-  Security: { bg: 'bg-muted/30', color: 'text-muted-foreground' },
-  Other: { bg: 'bg-muted/20', color: 'text-muted-foreground' },
-};
-
-const charges: PortCharge[] = [
-  { id: 'CHG-001', invoice: 'INV-2026-0421', vessel: 'CMA CGM ALTAMIRA', voyage: 'CNYTN-ALT-2026', category: 'Berthage', description: 'Berth B-12 occupancy (12h)', amount: 4800, currency: 'USD', status: 'Paid', issuedDate: '13 May 2026', dueDate: '20 May 2026', paidDate: '13 May 2026', payer: 'CMA CGM', refNo: 'BTH-0421', quantity: '12 hours', unitRate: '$400/h' },
-  { id: 'CHG-002', invoice: 'INV-2026-0421', vessel: 'CMA CGM ALTAMIRA', voyage: 'CNYTN-ALT-2026', category: 'Wharfage', description: 'Container storage (34 TEU × 2 days)', amount: 4080, currency: 'USD', status: 'Paid', issuedDate: '13 May 2026', dueDate: '20 May 2026', paidDate: '13 May 2026', payer: 'CMA CGM', refNo: 'WHF-0421', quantity: '68 TEU-days', unitRate: '$60/TEU-day' },
-  { id: 'CHG-003', invoice: 'INV-2026-0421', vessel: 'CMA CGM ALTAMIRA', voyage: 'CNYTN-ALT-2026', category: 'Pilotage', description: 'Pilot service (arrival)', amount: 1500, currency: 'USD', status: 'Paid', issuedDate: '13 May 2026', dueDate: '20 May 2026', paidDate: '13 May 2026', payer: 'CMA CGM', refNo: 'PIL-0421', quantity: '1 service', unitRate: '$1,500' },
-  { id: 'CHG-004', invoice: 'INV-2026-0422', vessel: 'MAERSK GUJARAT', voyage: 'INMUM-SGSIN-2026', category: 'Berthage', description: 'Berth C-03 reservation', amount: 3600, currency: 'USD', status: 'Pending', issuedDate: '14 May 2026', dueDate: '21 May 2026', paidDate: null, payer: 'Maersk Line', refNo: 'BTH-0422', quantity: '8 hours', unitRate: '$450/h' },
-  { id: 'CHG-005', invoice: 'INV-2026-0422', vessel: 'MAERSK GUJARAT', voyage: 'INMUM-SGSIN-2026', category: 'Towage', description: 'Tug assistance (2 tugs × 2h)', amount: 3200, currency: 'USD', status: 'Pending', issuedDate: '14 May 2026', dueDate: '21 May 2026', paidDate: null, payer: 'Maersk Line', refNo: 'TOW-0422', quantity: '4 tug-hours', unitRate: '$800/tug-h' },
-  { id: 'CHG-006', invoice: 'INV-2026-0423', vessel: 'MSC ZOE', voyage: 'LKCMB-JPTYO-2026', category: 'Handling', description: 'Cargo handling (18 containers)', amount: 5400, currency: 'USD', status: 'Overdue', issuedDate: '12 May 2026', dueDate: '19 May 2026', paidDate: null, payer: 'MSC', refNo: 'HDL-0423', quantity: '18 lifts', unitRate: '$300/lift' },
-  { id: 'CHG-007', invoice: 'INV-2026-0423', vessel: 'MSC ZOE', voyage: 'LKCMB-JPTYO-2026', category: 'Mooring', description: 'Mooring/unmooring service', amount: 800, currency: 'USD', status: 'Overdue', issuedDate: '12 May 2026', dueDate: '19 May 2026', paidDate: null, payer: 'MSC', refNo: 'MOO-0423', quantity: '2 services', unitRate: '$400' },
-  { id: 'CHG-008', invoice: 'INV-2026-0424', vessel: 'OOCL HONG KONG', voyage: 'SGSIN-INNSA-2026', category: 'Customs', description: 'Customs inspection fee', amount: 1200, currency: 'USD', status: 'Pending', issuedDate: '14 May 2026', dueDate: '21 May 2026', paidDate: null, payer: 'OOCL', refNo: 'CUS-0424', quantity: '1 inspection', unitRate: '$1,200' },
-  { id: 'CHG-009', invoice: 'INV-2026-0425', vessel: 'MSC AURORA', voyage: 'DEHAM-CNSHA-2026', category: 'Storage', description: 'Container storage (31 TEU × 5 days)', amount: 9300, currency: 'USD', status: 'Disputed', issuedDate: '10 May 2026', dueDate: '17 May 2026', paidDate: null, payer: 'MSC', refNo: 'STR-0425', quantity: '155 TEU-days', unitRate: '$60/TEU-day' },
-  { id: 'CHG-010', invoice: 'INV-2026-0426', vessel: 'EVERGREEN LOTUS', voyage: 'NLRTM-CNSHA-2026', category: 'Security', description: 'Port security fee', amount: 450, currency: 'USD', status: 'Paid', issuedDate: '14 May 2026', dueDate: '21 May 2026', paidDate: '14 May 2026', payer: 'Evergreen', refNo: 'SEC-0426', quantity: '1 vessel', unitRate: '$450' },
-];
+function StatusPill({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+  const colors = label !== 'All' ? chargeStatusColors[label] : '';
+  const statusDot: Record<string, string> = { Pending: 'bg-amber-400', Collected: 'bg-emerald-400', Overdue: 'bg-red-400', Disputed: 'bg-orange-400', Waived: 'bg-gray-400' };
+  return (
+    <button onClick={onClick} className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.70rem] font-bold border transition-all', active && colors ? `${colors} shadow-sm` : '', active && !colors ? 'bg-primary/10 text-primary border-primary/30 shadow-sm' : '', !active ? 'bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground hover:border-border' : '')}>
+      {label !== 'All' && <span className={cn('w-1.5 h-1.5 rounded-full', statusDot[label] || 'bg-muted-foreground')} />}
+      {label}<span className={cn('text-[0.65rem]', active ? 'opacity-80' : 'text-muted-foreground/60')}>{count}</span>
+    </button>
+  );
+}
 
 export default function ChargesPage() {
+  const [data, setData] = useState<PortCharge[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedCharge, setSelectedCharge] = useState<PortCharge | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCharge, setEditingCharge] = useState<Partial<PortCharge>>({ ...emptyCharge });
+  const [isEditing, setIsEditing] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingCharge, setDeletingCharge] = useState<PortCharge | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const categories = useMemo(() => [...new Set(charges.map(c => c.category))], []);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await portService.listCharges({ search: search || undefined, category: categoryFilter !== 'All' ? categoryFilter : undefined, status: statusFilter !== 'All' ? statusFilter : undefined });
+      setData(result);
+    } catch { setError('Failed to load port charges'); }
+    finally { setLoading(false); }
+  }, [search, categoryFilter, statusFilter]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const stats = useMemo(() => {
+    const total = data.reduce((s, c) => s + c.amount, 0);
+    const collected = data.filter(c => c.status === 'Collected').reduce((s, c) => s + c.amount, 0);
+    const pending = data.filter(c => c.status === 'Pending').reduce((s, c) => s + c.amount, 0);
+    const overdue = data.filter(c => c.status === 'Overdue').reduce((s, c) => s + c.amount, 0);
+    const disputed = data.filter(c => c.status === 'Disputed').reduce((s, c) => s + c.amount, 0);
+    return { total, collected, pending, overdue, disputed };
+  }, [data]);
+
+  const statusPills = useMemo(() => {
+    const counts: Record<string, number> = { All: data.length };
+    data.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
+    return ['All', 'Pending', 'Collected', 'Overdue', 'Disputed', 'Waived'].map(label => ({ label, count: counts[label] || 0 }));
+  }, [data]);
 
   const filtered = useMemo(() => {
-    let result = [...charges];
+    let result = [...data];
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(c => c.invoice.toLowerCase().includes(q) || c.vessel.toLowerCase().includes(q) || c.payer.toLowerCase().includes(q) || c.refNo.toLowerCase().includes(q));
+      result = result.filter(c => c.chargeId.toLowerCase().includes(q) || c.invoiceRef.toLowerCase().includes(q) || c.vessel.toLowerCase().includes(q) || c.description.toLowerCase().includes(q) || c.payer.toLowerCase().includes(q));
     }
+    if (categoryFilter !== 'All') result = result.filter(c => c.type === categoryFilter);
     if (statusFilter !== 'All') result = result.filter(c => c.status === statusFilter);
-    if (categoryFilter !== 'All') result = result.filter(c => c.category === categoryFilter);
     return result;
-  }, [search, statusFilter, categoryFilter]);
+  }, [data, search, categoryFilter, statusFilter]);
 
-  const stats = useMemo(() => ({
-    total: charges.length,
-    totalAmount: charges.reduce((s, c) => s + c.amount, 0),
-    paid: charges.filter(c => c.status === 'Paid').reduce((s, c) => s + c.amount, 0),
-    pending: charges.filter(c => c.status === 'Pending').reduce((s, c) => s + c.amount, 0),
-    overdue: charges.filter(c => c.status === 'Overdue').reduce((s, c) => s + c.amount, 0),
-    disputed: charges.filter(c => c.status === 'Disputed').reduce((s, c) => s + c.amount, 0),
-  }), []);
+  const openCreate = () => { setEditingCharge({ ...emptyCharge, issuedDate: new Date().toISOString().split('T')[0] }); setIsEditing(false); setDialogOpen(true); };
+  const openEdit = (charge: PortCharge) => { setEditingCharge({ ...charge, issuedDate: charge.issuedDate?.split('T')[0] || '', dueDate: charge.dueDate?.split('T')[0] || '', paidDate: charge.paidDate?.split('T')[0] || '' }); setIsEditing(true); setDialogOpen(true); };
+  const openDetail = (charge: PortCharge) => { setSelectedCharge(charge); setDrawerOpen(true); };
+  const openDelete = (charge: PortCharge) => { setDeletingCharge(charge); setDeleteOpen(true); };
 
-  const statusPills = [
-    { label: 'All', count: charges.length },
-    { label: 'Pending', count: charges.filter(c => c.status === 'Pending').length },
-    { label: 'Paid', count: charges.filter(c => c.status === 'Paid').length },
-    { label: 'Overdue', count: charges.filter(c => c.status === 'Overdue').length },
-    { label: 'Disputed', count: charges.filter(c => c.status === 'Disputed').length },
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = { ...editingCharge, amount: (editingCharge.quantity || 0) * (editingCharge.rate || 0) };
+      if (isEditing && editingCharge.id) {
+        const updated = await portService.updateCharge(editingCharge.id, payload);
+        setData(prev => prev.map(c => c.id === editingCharge.id ? updated : c));
+        toast.success('Charge updated successfully');
+      } else {
+        const created = await portService.createCharge(payload);
+        setData(prev => [created, ...prev]);
+        toast.success('Charge created successfully');
+      }
+      setDialogOpen(false);
+    } catch { toast.error('Failed to save charge'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingCharge) return;
+    try {
+      await portService.deleteCharge(deletingCharge.id);
+      setData(prev => prev.filter(c => c.id !== deletingCharge.id));
+      toast.success('Charge deleted successfully');
+      setDeleteOpen(false);
+      setDeletingCharge(null);
+    } catch { toast.error('Failed to delete charge'); }
+  };
+
+  const handleStatusUpdate = async (charge: PortCharge, newStatus: ChargeStatus) => {
+    try {
+      const updated = await portService.updateCharge(charge.id, { status: newStatus, ...(newStatus === 'Collected' ? { paidDate: new Date().toISOString() } : {}) });
+      setData(prev => prev.map(c => c.id === charge.id ? updated : c));
+      toast.success(`Charge marked as ${newStatus}`);
+    } catch { toast.error('Failed to update status'); }
+  };
+
+  const handleExport = () => {
+    const headers = [
+      { key: 'chargeId' as keyof PortCharge, label: 'Charge ID' },
+      { key: 'invoiceRef' as keyof PortCharge, label: 'Invoice Ref' },
+      { key: 'type' as keyof PortCharge, label: 'Category' },
+      { key: 'vessel' as keyof PortCharge, label: 'Vessel' },
+      { key: 'voyage' as keyof PortCharge, label: 'Voyage' },
+      { key: 'description' as keyof PortCharge, label: 'Description' },
+      { key: 'payer' as keyof PortCharge, label: 'Payer' },
+      { key: 'amount' as keyof PortCharge, label: 'Amount' },
+      { key: 'currency' as keyof PortCharge, label: 'Currency' },
+      { key: 'status' as keyof PortCharge, label: 'Status' },
+      { key: 'dueDate' as keyof PortCharge, label: 'Due Date' },
+      { key: 'paidDate' as keyof PortCharge, label: 'Paid Date' },
+    ];
+    exportToCSV(filtered as unknown as Record<string, unknown>[], 'port-charges', headers);
+    toast.success('Charges exported to CSV');
+  };
+
+  const computeAmount = (q: number | undefined, r: number | undefined) => (q || 0) * (r || 0);
+  const showActions = selectedCharge || (!!search) || categoryFilter !== 'All' || statusFilter !== 'All';
+
+  const columns: Column<PortCharge>[] = [
+    {
+      key: 'invoiceRef', header: 'Invoice Ref', sortable: true,
+      render: (c) => (
+        <button onClick={() => openDetail(c)} className="text-left min-w-0 hover:opacity-80">
+          <p className="text-sm font-semibold text-foreground">{c.invoiceRef}</p>
+          <p className="text-xs text-muted-foreground font-mono">{c.chargeId}</p>
+        </button>
+      ),
+    },
+    {
+      key: 'type', header: 'Type / Category', sortable: true,
+      render: (c) => (
+        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-bold border', chargeCategoryColors[c.type] || 'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/20')}>
+          {c.type}
+        </span>
+      ),
+    },
+    {
+      key: 'vessel', header: 'Vessel / Voyage', sortable: true,
+      render: (c) => (
+        <div className="min-w-0">
+          <p className="text-sm text-foreground truncate">{c.vessel}</p>
+          <p className="text-xs font-mono text-muted-foreground">{c.voyage}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'description', header: 'Description',
+      render: (c) => <span className="text-sm text-muted-foreground max-w-[200px] truncate block">{c.description}</span>,
+    },
+    {
+      key: 'payer', header: 'Payer', sortable: true,
+      render: (c) => <span className="text-sm text-foreground">{c.payer}</span>,
+    },
+    {
+      key: 'amount', header: 'Amount', sortable: true,
+      render: (c) => <span className="text-sm font-semibold text-foreground font-mono whitespace-nowrap">{formatCurrency(c.amount, c.currency)}</span>,
+    },
+    {
+      key: 'status', header: 'Status', sortable: true,
+      render: (c) => (
+        <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border', chargeStatusColors[c.status] || '')}>
+          <span className={cn('w-1.5 h-1.5 rounded-full', c.status === 'Pending' ? 'bg-amber-400' : c.status === 'Collected' ? 'bg-emerald-400' : c.status === 'Overdue' ? 'bg-red-400' : c.status === 'Disputed' ? 'bg-orange-400' : 'bg-gray-400')} />
+          {c.status}
+        </span>
+      ),
+    },
+    {
+      key: 'dueDate', header: 'Due / Paid', sortable: true,
+      render: (c) => (
+        <div className="min-w-0 whitespace-nowrap">
+          <p className="text-xs text-foreground">Due: {formatDate(c.dueDate, 'short')}</p>
+          <p className="text-xs text-muted-foreground">{c.paidDate ? `Paid: ${formatDate(c.paidDate, 'short')}` : '\u2014'}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'id', header: '', className: 'w-[200px] text-right',
+      render: (c) => (
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={() => openDetail(c)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors" title="View"><Eye className="w-4 h-4" /></button>
+          <button onClick={() => openEdit(c)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400 transition-colors" title="Edit"><Pencil className="w-4 h-4" /></button>
+          <div className="relative group">
+            <button className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-amber-500/10 hover:text-amber-400 transition-colors" title="Update Status"><TrendingUp className="w-4 h-4" /></button>
+            <div className="absolute right-0 top-full mt-1 z-50 hidden group-hover:block bg-card border border-border/60 rounded-lg shadow-xl py-1 min-w-[160px]">
+              {statusOptions.filter(s => s !== c.status).map(s => (
+                <button key={s} onClick={() => handleStatusUpdate(c, s)} className="w-full text-left px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50 transition-colors">{s === 'Collected' ? 'Mark as Collected' : s === 'Overdue' ? 'Mark as Overdue' : s === 'Disputed' ? 'Mark as Disputed' : s === 'Waived' ? 'Mark as Waived' : s}</button>
+              ))}
+            </div>
+          </div>
+          <button onClick={() => openDelete(c)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
+        </div>
+      ),
+    },
   ];
 
-  const formatUSD = (n: number) => `$${n.toLocaleString()}`;
+  if (error) {
+    return (
+      <PageWrapper title="Port Charges" description="Port handling fees, demurrage, and storage charges">
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center"><AlertTriangle className="w-8 h-8 text-red-400" /></div>
+          <h3 className="text-lg font-medium text-foreground">Failed to load port charges</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">{error}</p>
+          <Button variant="outline" onClick={fetchData} className="gap-2"><RotateCcw className="w-4 h-4" />Retry</Button>
+        </div>
+      </PageWrapper>
+    );
+  }
 
   return (
     <PageWrapper
       title="Port Charges"
-      description="Manage port fees, invoices, billing for berthage, wharfage, pilotage, and all port services"
+      description="Port handling fees, demurrage, and storage charges"
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2 rounded-[9px]"><Printer className="w-4 h-4" />Print</Button>
-          <Button className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md hover:shadow-lg hover:from-sky-600 hover:to-indigo-600 rounded-[10px] gap-2">
-            <Receipt className="w-4 h-4" />Generate Invoice
-          </Button>
+          <Button variant="outline" onClick={handleExport} className="gap-2 rounded-[9px]"><Download className="w-4 h-4" />Export CSV</Button>
+          <Button onClick={openCreate} className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md hover:shadow-lg rounded-[10px] gap-2"><Plus className="w-4 h-4" />Create Charge</Button>
         </div>
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-        <KPICard title="Total Charges" value={formatUSD(stats.totalAmount)} icon={<DollarSign className="w-5 h-5" />} iconColor="cyan" />
-        <KPICard title="Collected" value={formatUSD(stats.paid)} icon={<CheckCircle2 className="w-5 h-5" />} iconColor="green" />
-        <KPICard title="Pending" value={formatUSD(stats.pending)} icon={<Clock className="w-5 h-5" />} iconColor="amber" />
-        <KPICard title="Overdue" value={formatUSD(stats.overdue)} icon={<AlertTriangle className="w-5 h-5" />} iconColor="red" />
-        <KPICard title="Disputed" value={formatUSD(stats.disputed)} icon={<FileText className="w-5 h-5" />} iconColor="indigo" />
+        <KPICard title="Total Charges" value={formatCurrency(stats.total, 'USD')} icon={<DollarSign className="w-5 h-5" />} iconColor="cyan" />
+        <KPICard title="Collected" value={formatCurrency(stats.collected, 'USD')} icon={<CheckCircle className="w-5 h-5" />} iconColor="green" />
+        <KPICard title="Pending" value={formatCurrency(stats.pending, 'USD')} icon={<Clock className="w-5 h-5" />} iconColor="amber" />
+        <KPICard title="Overdue" value={formatCurrency(stats.overdue, 'USD')} icon={<AlertTriangle className="w-5 h-5" />} iconColor="red" />
+        <KPICard title="Disputed" value={formatCurrency(stats.disputed, 'USD')} icon={<Ban className="w-5 h-5" />} iconColor="amber" />
       </div>
 
       <div className="bg-card border border-border/60 rounded-xl p-4 mb-6 shadow-soft">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input value={search} onChange={e => { setSearch(e.target.value); setLoading(true); setTimeout(() => setLoading(false), 300); }} placeholder="Search invoice, vessel, payer, ref..." className="w-full h-9 pl-9 pr-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:bg-primary/5 focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.1)] transition-all duration-200" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoice, vessel, payer, ref..." className="w-full h-9 pl-9 pr-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:bg-primary/5 focus:shadow-[0_0_0_3px_oklch(var(--primary)/0.1)] transition-all duration-200" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>}
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[170px] h-9 bg-muted/40 border-border rounded-[9px] text-[0.84rem]"><SelectValue placeholder="All Categories" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Categories</SelectItem>
-              {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-[170px] h-9 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground outline-none focus:border-primary/50 px-3">
+            <option value="All">All Categories</option>
+            {chargeCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {statusPills.map(pill => {
-            const isActive = statusFilter === pill.label;
-            const meta = pill.label !== 'All' ? STATUS_META[pill.label as ChargeStatus] : null;
-            return (
-              <button key={pill.label} onClick={() => setStatusFilter(pill.label)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.70rem] font-bold border transition-all ${isActive ? meta ? `${meta.pill} shadow-sm` : 'bg-primary/10 text-primary border-primary/30 shadow-sm' : 'bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground hover:border-border'}`}>
-                {meta && <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />}
-                {pill.label} <span className="text-[0.65rem] opacity-60">{pill.count}</span>
-              </button>
-            );
-          })}
+          {statusPills.map(pill => <StatusPill key={pill.label} label={pill.label} count={pill.count} active={statusFilter === pill.label} onClick={() => setStatusFilter(pill.label)} />)}
         </div>
-        {(search || statusFilter !== 'All' || categoryFilter !== 'All') && <p className="text-[0.72rem] text-muted-foreground mt-2.5 ml-1">{filtered.length} charge(s) found</p>}
       </div>
 
-      {loading ? <SkeletonLoader variant="card" count={4} /> : filtered.length === 0 ? (
-        <div className="bg-card border border-border/60 rounded-xl shadow-soft py-20 flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-muted/40 border border-border/50 flex items-center justify-center"><DollarSign className="w-7 h-7 text-muted-foreground/30" /></div>
-          <p className="text-[0.88rem] font-semibold text-foreground">No charges found</p>
-          <p className="text-[0.78rem] text-muted-foreground">Try adjusting your search or filter criteria</p>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-4 px-4 py-2 mb-4 bg-card border border-border/60 rounded-lg shadow-soft text-[0.78rem] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" />{filtered.length} charges</span>
-            <span className="w-px h-3 bg-border/50" />
-            <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5" />Total: {formatUSD(filtered.reduce((s, c) => s + c.amount, 0))}</span>
+      {loading ? <LoadingState rows={5} message="Loading port charges..." /> : filtered.length === 0 ? (
+        <EmptyState icon={<Receipt className="w-8 h-8 text-muted-foreground" />} title="No charges found" description={search || categoryFilter !== 'All' || statusFilter !== 'All' ? 'Try adjusting your search or filter criteria' : 'No port charges recorded yet'} />
+      ) : <DataTable<PortCharge> data={filtered} columns={columns} pageSize={10} emptyMessage="No charges match your criteria" />}
+
+      {/* Create/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{isEditing ? 'Edit Charge' : 'Create Charge'}</DialogTitle><DialogClose /></DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Type / Category</Label>
+              <Select value={editingCharge.type} onValueChange={v => setEditingCharge(p => ({ ...p, type: v as ChargeCategory }))}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {chargeCategories.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Status</Label>
+              <Select value={editingCharge.status} onValueChange={v => setEditingCharge(p => ({ ...p, status: v as ChargeStatus }))}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Vessel</Label>
+              <Input value={editingCharge.vessel || ''} onChange={e => setEditingCharge(p => ({ ...p, vessel: e.target.value }))} className="h-9 text-xs" placeholder="Vessel name" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Vessel ID</Label>
+              <Input value={editingCharge.vesselId || ''} onChange={e => setEditingCharge(p => ({ ...p, vesselId: e.target.value }))} className="h-9 text-xs" placeholder="Vessel ID" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Voyage</Label>
+              <Input value={editingCharge.voyage || ''} onChange={e => setEditingCharge(p => ({ ...p, voyage: e.target.value }))} className="h-9 text-xs" placeholder="Voyage number" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Payer</Label>
+              <Input value={editingCharge.payer || ''} onChange={e => setEditingCharge(p => ({ ...p, payer: e.target.value }))} className="h-9 text-xs" placeholder="Payer name" />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs">Description</Label>
+              <Input value={editingCharge.description || ''} onChange={e => setEditingCharge(p => ({ ...p, description: e.target.value }))} className="h-9 text-xs" placeholder="Charge description" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Quantity</Label>
+              <Input type="number" value={editingCharge.quantity || 0} onChange={e => setEditingCharge(p => ({ ...p, quantity: Number(e.target.value) }))} className="h-9 text-xs" min={0} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Rate</Label>
+              <Input type="number" value={editingCharge.rate || 0} onChange={e => setEditingCharge(p => ({ ...p, rate: Number(e.target.value) }))} className="h-9 text-xs" min={0} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Currency</Label>
+              <Select value={editingCharge.currency} onValueChange={v => setEditingCharge(p => ({ ...p, currency: v as 'USD' | 'EUR' | 'INR' | 'SGD' }))}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {currencies.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Amount (computed)</Label>
+              <Input value={formatCurrency(computeAmount(editingCharge.quantity, editingCharge.rate), editingCharge.currency || 'USD')} className="h-9 text-xs font-mono font-semibold" readOnly />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Issued Date</Label>
+              <Input type="date" value={editingCharge.issuedDate || ''} onChange={e => setEditingCharge(p => ({ ...p, issuedDate: e.target.value }))} className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Due Date</Label>
+              <Input type="date" value={editingCharge.dueDate || ''} onChange={e => setEditingCharge(p => ({ ...p, dueDate: e.target.value }))} className="h-9 text-xs" />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs">Notes</Label>
+              <Input value={editingCharge.notes || ''} onChange={e => setEditingCharge(p => ({ ...p, notes: e.target.value }))} className="h-9 text-xs" placeholder="Optional notes" />
+            </div>
           </div>
-          <div className="space-y-3">
-            {filtered.map(charge => {
-              const meta = STATUS_META[charge.status];
-              const cat = CATEGORY_META[charge.category];
-              return (
-                <div key={charge.id} className="group bg-card border border-border/60 rounded-xl shadow-soft p-4 hover:border-primary/25 hover:shadow-[0_8px_32px_oklch(var(--primary)/0.08)] hover:-translate-y-0.5 transition-all duration-300">
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-10 h-10 rounded-xl ${cat.bg} flex items-center justify-center shrink-0 ${cat.color}`}>
-                            <DollarSign className="w-5 h-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-[0.88rem] font-semibold text-foreground font-mono">{charge.invoice}</h3>
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[0.65rem] font-bold border ${meta.pill}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />{charge.status}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-0.5 text-[0.72rem] text-muted-foreground">
-                              <span>{charge.vessel}</span>
-                              <span className="w-px h-3 bg-border/40" />
-                              <span className="font-mono">{charge.voyage}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <span className="text-[0.90rem] font-bold text-foreground font-mono">
-                          {formatUSD(charge.amount)}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Category</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5">{charge.category}</p>
-                          <p className="text-[0.70rem] text-muted-foreground">{charge.description}</p>
-                        </div>
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Payer</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5">{charge.payer}</p>
-                          <p className="text-[0.70rem] text-muted-foreground font-mono">{charge.refNo}</p>
-                        </div>
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Quantity / Rate</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5">{charge.quantity}</p>
-                          <p className="text-[0.70rem] text-muted-foreground">@ {charge.unitRate}</p>
-                        </div>
-                        <div>
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">Due / Paid</p>
-                          <p className="text-[0.82rem] font-medium text-foreground mt-0.5">Due: {charge.dueDate}</p>
-                          <p className="text-[0.70rem] text-muted-foreground">{charge.paidDate ? `Paid: ${charge.paidDate}` : 'Unpaid'}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex lg:flex-col items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary"><Eye className="w-3.5 h-3.5" /></button>
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-sky-500/10 hover:text-sky-400"><Download className="w-3.5 h-3.5" /></button>
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : isEditing ? 'Update Charge' : 'Create Charge'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail Drawer */}
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent className="max-w-md">
+          <DrawerHeader><DrawerTitle>Charge Details</DrawerTitle><DrawerClose /></DrawerHeader>
+          {selectedCharge && (
+            <div className="px-6 pb-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-bold text-foreground">{selectedCharge.invoiceRef}</p>
+                  <p className="text-xs font-mono text-muted-foreground">{selectedCharge.chargeId}</p>
                 </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+                <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border', chargeStatusColors[selectedCharge.status] || '')}>
+                  <span className={cn('w-1.5 h-1.5 rounded-full', selectedCharge.status === 'Pending' ? 'bg-amber-400' : selectedCharge.status === 'Collected' ? 'bg-emerald-400' : selectedCharge.status === 'Overdue' ? 'bg-red-400' : selectedCharge.status === 'Disputed' ? 'bg-orange-400' : 'bg-gray-400')} />
+                  {selectedCharge.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Category</p><p className="font-medium text-foreground">{selectedCharge.type}</p></div>
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Amount</p><p className="font-medium text-foreground font-mono">{formatCurrency(selectedCharge.amount, selectedCharge.currency)}</p></div>
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Vessel</p><p className="font-medium text-foreground">{selectedCharge.vessel}</p></div>
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Voyage</p><p className="font-medium text-foreground">{selectedCharge.voyage}</p></div>
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Payer</p><p className="font-medium text-foreground">{selectedCharge.payer}</p></div>
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Qty x Rate</p><p className="font-medium text-foreground">{selectedCharge.quantity} x {formatCurrency(selectedCharge.rate, selectedCharge.currency)}</p></div>
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Issued</p><p className="font-medium text-foreground">{formatDate(selectedCharge.issuedDate, 'short')}</p></div>
+                <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Due</p><p className="font-medium text-foreground">{formatDate(selectedCharge.dueDate, 'short')}</p></div>
+                {selectedCharge.paidDate && <div className="p-3 bg-muted/20 rounded-lg"><p className="text-xs text-muted-foreground">Paid</p><p className="font-medium text-foreground">{formatDate(selectedCharge.paidDate, 'short')}</p></div>}
+                {selectedCharge.invoiceLink && <div className="p-3 bg-muted/20 rounded-lg col-span-2"><p className="text-xs text-muted-foreground">Invoice Link</p><a href={selectedCharge.invoiceLink} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline text-xs">{selectedCharge.invoiceLink}</a></div>}
+              </div>
+
+              {selectedCharge.notes && (
+                <div className="p-3 bg-muted/20 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                  <p className="text-sm text-foreground">{selectedCharge.notes}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                {statusOptions.filter(s => s !== selectedCharge.status).map(s => (
+                  <Button key={s} size="sm" variant="outline" className="text-xs" onClick={() => { handleStatusUpdate(selectedCharge, s); setDrawerOpen(false); }}>
+                    {s === 'Collected' ? 'Mark Collected' : s === 'Overdue' ? 'Mark Overdue' : s === 'Disputed' ? 'Mark Disputed' : s === 'Waived' ? 'Mark Waived' : s}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Delete Charge</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogDescription>Are you sure you want to delete charge <strong>{deletingCharge?.invoiceRef}</strong>? This action cannot be undone.</AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageWrapper>
   );
 }
