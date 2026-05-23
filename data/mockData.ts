@@ -23,6 +23,13 @@ export type UserRole =
   | 'Dispatcher' | 'Operator' | 'Agent' | 'Staff'
   | 'CustomsAgent' | 'PortAgent' | 'CustomerPortal' | 'AuditorReadOnly';
 export type AgentType = 'warehouse' | 'driver' | 'finance';
+export type CompanyOperationalType =
+  | 'standard'
+  | 'custom_agent'
+  | 'destination_agent'
+  | 'origin_agent'
+  | 'transporter'
+  | 'trucking_agent';
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
 
 // LOGISTICS OPERATION TYPES
@@ -49,6 +56,7 @@ export interface Company {
   country: string;
   taxId: string;
   businessType: 'Freight' | 'Express' | 'Courier' | 'Logistics' | 'Mixed';
+  companyType?: CompanyOperationalType;
   registrationDate: string;
   approvalDate: string | null;
   approvedBy: string | null; // SuperAdmin user ID
@@ -1034,7 +1042,7 @@ export const mockUsers: MockUser[] = [
   {
     id: 'usr-008', name: 'Vikram Sharma', username: 'company_admin', password: 'admin123',
     email: 'admin@techlogistics.com', phone: '+91 98765 43217',
-    role: 'CompanyAdmin', status: 'Active',
+    role: 'CompanyAdmin', status: 'Active', companyType: 'custom_agent',
     companyId: 'cmp-001', organizationId: null, agentId: null,
     avatar: 'VS', dashboardRoute: '/company/dashboard',
     menuAccess: ROLE_MENU_ACCESS['CompanyAdmin'],

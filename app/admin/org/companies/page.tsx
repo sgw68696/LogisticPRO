@@ -7,7 +7,8 @@ import { DataTable, type Column } from '@/components/shared/DataTable';
 import { companyService, type CreateCompanyRequest } from '@/services/companyService';
 import { organizationService, type SimpleOrganization } from '@/services/organizationService';
 import { companyTypeService, type CompanyType } from '@/services/companyTypeService';
-import type { Company, CompanyStatus } from '@/data/mockData';
+import type { Company, CompanyStatus, CompanyOperationalType } from '@/data/mockData';
+import { COMPANY_OPERATIONAL_TYPES } from '@/types/company-operational-types';
 import {
   Search, Plus, SlidersHorizontal, X, Building2, Loader2, Users,
   Eye, Edit, Trash2, Check, AlertCircle,
@@ -418,6 +419,25 @@ function CompanyForm({ formData, setFormData, onSubmit, loading, organizations, 
             {companyTypes.map(ct => (
               <option key={ct.id} value={ct.id}>{ct.name}</option>
             ))}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <div>
+          <label className="block text-[0.78rem] font-medium text-muted-foreground mb-1">Operational Type</label>
+          <select value={(formData as any).operational_type || ''} onChange={e => setFormData({ ...formData, operational_type: e.target.value as any })} className="w-full h-9 px-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground outline-none focus:border-primary/50">
+            <option value="">Standard (No specific type)</option>
+            {COMPANY_OPERATIONAL_TYPES.filter(t => t.slug !== 'standard').map(ct => (
+              <option key={ct.slug} value={ct.slug}>{ct.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[0.78rem] font-medium text-muted-foreground mb-1">Plan</label>
+          <select value={(formData as any).plan || 'Professional'} onChange={e => setFormData({ ...formData, plan: e.target.value as any })} className="w-full h-9 px-3 bg-muted/40 border border-border rounded-[9px] text-[0.84rem] text-foreground outline-none focus:border-primary/50">
+            <option value="Starter">Starter</option>
+            <option value="Professional">Professional</option>
+            <option value="Enterprise">Enterprise</option>
           </select>
         </div>
       </div>

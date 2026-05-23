@@ -54,6 +54,8 @@ export interface CreateCompanyRequest {
   postal_code?: string;
   subscription_status?: 'trial' | 'active' | 'suspended' | 'cancelled';
   status?: 'pending' | 'active' | 'suspended' | 'inactive';
+  operational_type?: string;
+  plan?: string;
   // User creation fields
   user_first_name?: string;
   user_last_name?: string;

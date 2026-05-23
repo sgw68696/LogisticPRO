@@ -9,6 +9,14 @@ export type UserRole =
 
 export type AgentType = 'warehouse' | 'driver' | 'finance';
 
+export type CompanyOperationalType =
+  | 'standard'
+  | 'custom_agent'
+  | 'destination_agent'
+  | 'origin_agent'
+  | 'transporter'
+  | 'trucking_agent';
+
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
 
 export type OrderStatus = 'Draft' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Returned';

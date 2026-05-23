@@ -1,6 +1,6 @@
-import type { UserRole, AgentType } from './enums';
+import type { UserRole, AgentType, CompanyOperationalType } from './enums';
 
-export type { UserRole, AgentType };
+export type { UserRole, AgentType, CompanyOperationalType };
 
 export interface MockUser {
   id: string;
@@ -11,6 +11,7 @@ export interface MockUser {
   phone: string;
   role: UserRole;
   agentType?: AgentType;
+  companyType?: CompanyOperationalType;
   status: 'Active' | 'Inactive';
   companyId: string | null;
   organizationId: string | null;

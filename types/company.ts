@@ -1,7 +1,7 @@
-import type { CompanyStatus, RegistrationStatus, UserRole } from './enums';
+import type { CompanyStatus, RegistrationStatus, UserRole, CompanyOperationalType } from './enums';
 import type { PermissionAction } from './enums';
 
-export type { CompanyStatus, RegistrationStatus };
+export type { CompanyStatus, RegistrationStatus, CompanyOperationalType };
 
 export interface Company {
   id: string;
@@ -18,6 +18,7 @@ export interface Company {
   country: string;
   taxId: string;
   businessType: 'Freight' | 'Express' | 'Courier' | 'Logistics' | 'Mixed';
+  companyType?: CompanyOperationalType;
   registrationDate: string;
   approvalDate: string | null;
   approvedBy: string | null;
