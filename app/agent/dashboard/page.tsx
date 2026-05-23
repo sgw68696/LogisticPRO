@@ -1,245 +1,357 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { warehouseService } from '@/services/warehouseService';
+import type { WarehouseDashboardStats, GoodsReceivedNote, GoodsDispatchNote, WarehouseNotification } from '@/types/warehouse';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { KPICard } from '@/components/shared/KPICard';
-import {
-  Package, TrendingUp, AlertCircle, CheckCircle,
-  Truck, MapPin, FileCheck, AlertTriangle,
-  FileText, CreditCard, RefreshCcw,
-} from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Badge } from '@/components/ui/badge';
-import { mockShipments, mockOrders, mockDrivers } from '@/data/mockData';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn, formatDate } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { toast } from 'sonner';
+import {
+  Package, TrendingUp, AlertCircle, CheckCircle, Truck, MapPin, FileCheck,
+  AlertTriangle, Warehouse as WarehouseIcon, ArrowRight, RefreshCw, Activity,
+  DollarSign, Box, ClipboardList, Clock, Bell, Ship, BarChart3
+} from 'lucide-react';
 
-const getStatusColor = (status: string) => {
-  const statusColorMap: Record<string, string> = {
-    'Pending': 'bg-yellow-500/10 text-yellow-700 border-yellow-200',
-    'Picked Up': 'bg-blue-500/10 text-blue-700 border-blue-200',
-    'In Transit': 'bg-cyan-500/10 text-cyan-700 border-cyan-200',
-    'Out for Delivery': 'bg-indigo-500/10 text-indigo-700 border-indigo-200',
-    'Delivered': 'bg-green-500/10 text-green-700 border-green-200',
-    'Cancelled': 'bg-gray-500/10 text-gray-700 border-gray-200',
-    'Failed': 'bg-red-500/10 text-red-700 border-red-200',
-    'Overdue': 'bg-orange-500/10 text-orange-700 border-orange-200',
-    'Unpaid': 'bg-red-500/10 text-red-700 border-red-200',
-    'Paid': 'bg-green-500/10 text-green-700 border-green-200',
-    'Available': 'bg-green-500/10 text-green-700 border-green-200',
-    'On Route': 'bg-cyan-500/10 text-cyan-700 border-cyan-200',
-  };
-  return statusColorMap[status] || 'bg-gray-500/10 text-gray-700 border-gray-200';
+interface ActivityItem {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  entityType: string;
+  icon: typeof Package;
+  iconColor: string;
+}
+
+const grnStatusColors: Record<string, string> = {
+  Draft: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  Expected: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Received: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  'In Inspection': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Putaway: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  Completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
+};
+
+const gdnStatusColors: Record<string, string> = {
+  Draft: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  Picking: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Packed: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Loading: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  Dispatched: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  Delivered: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
+};
+
+const notifSeverityColors: Record<string, string> = {
+  Info: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Warning: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Critical: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
 
 export default function AgentDashboard() {
-  const agentType = useMemo(() => {
-    const storedUser = localStorage.getItem('loggedInUser');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      return parsed.agentType as 'warehouse' | 'driver' | 'finance';
+  const [stats, setStats] = useState<WarehouseDashboardStats | null>(null);
+  const [grns, setGrns] = useState<GoodsReceivedNote[]>([]);
+  const [gdns, setGdns] = useState<GoodsDispatchNote[]>([]);
+  const [notifications, setNotifications] = useState<WarehouseNotification[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [statsData, grnsData, gdnsData, notifsData, activityData] = await Promise.all([
+        warehouseService.getDashboardStats(),
+        warehouseService.listGRNs({ status: 'All' }),
+        warehouseService.listGDNs({ status: 'All' }),
+        warehouseService.listNotifications(),
+        warehouseService.getActivities({ limit: 10 }),
+      ]);
+      setStats(statsData);
+      const recentGrns = (grnsData as GoodsReceivedNote[])
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+      setGrns(recentGrns);
+      const recentGdns = (gdnsData as GoodsDispatchNote[])
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+      setGdns(recentGdns);
+      setNotifications((notifsData as WarehouseNotification[]).slice(0, 5));
+
+      const activityIconMap: Record<string, typeof Package> = {
+        GRN: FileCheck, GDN: Truck, Damage: AlertTriangle, Shipment: Package, Stock: Package, System: Bell,
+      };
+      const activityColorMap: Record<string, string> = {
+        GRN: 'text-cyan-400', GDN: 'text-amber-400', Damage: 'text-red-400',
+        Shipment: 'text-indigo-400', Stock: 'text-emerald-400', System: 'text-blue-400',
+      };
+      setActivities(
+        (activityData as any[]).slice(0, 8).map((a) => ({
+          id: a.id,
+          type: a.type,
+          title: a.title,
+          description: a.description,
+          timestamp: a.timestamp,
+          entityType: a.entityType,
+          icon: activityIconMap[a.entityType] || Package,
+          iconColor: activityColorMap[a.entityType] || 'text-muted-foreground',
+        }))
+      );
+      setLastUpdated(new Date().toISOString());
+    } catch {
+      setError('Failed to load dashboard data');
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
     }
-    return 'warehouse';
   }, []);
 
-  const dashboardContent = useMemo(() => {
-    if (agentType === 'warehouse') {
-      // Warehouse KPIs: GRNs Today, Pending Outbound, Stock Alerts, Damage Reports
-      const grnCount = 8; // Mock static count
-      const outboundCount = 12; // Mock static count
-      const alertCount = 3; // Mock static count
-      const damageCount = 2; // Mock static count
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-      const taskTable = (
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4">Recent GRNs</h3>
-          <div className="border border-[rgba(14,165,233,0.1)] rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader className="bg-[rgba(14,165,233,0.05)]">
-                <TableRow>
-                  <TableHead className="text-[#7dd3fc]">Ref No.</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Warehouse</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Items</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Received By</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[
-                  { ref: 'GRN-2025-0521', warehouse: 'Mumbai Central', items: 45, by: 'Rajesh K', status: 'Completed' },
-                  { ref: 'GRN-2025-0520', warehouse: 'Delhi North', items: 32, by: 'Priya S', status: 'In Progress' },
-                  { ref: 'GRN-2025-0519', warehouse: 'Bangalore East', items: 58, by: 'Amit P', status: 'Completed' },
-                  { ref: 'GRN-2025-0518', warehouse: 'Pune West', items: 21, by: 'Sunita R', status: 'Completed' },
-                  { ref: 'GRN-2025-0517', warehouse: 'Chennai South', items: 37, by: 'Mohammed K', status: 'Pending' },
-                ].map((row) => (
-                  <TableRow key={row.ref}>
-                    <TableCell className="text-[#e0f2fe]">{row.ref}</TableCell>
-                    <TableCell className="text-[rgba(148,163,184,0.8)]">{row.warehouse}</TableCell>
-                    <TableCell className="text-[rgba(148,163,184,0.8)]">{row.items}</TableCell>
-                    <TableCell className="text-[rgba(148,163,184,0.8)]">{row.by}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(row.status)}>
-                        {row.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      );
-
-      return {
-        title: 'Warehouse Dashboard',
-        kpis: [
-          { title: 'GRNs Today', value: grnCount, icon: <Package className="w-5 h-5" />, trend: { value: 2, isPositive: true }, description: undefined },
-          { title: 'Pending Outbound', value: outboundCount, icon: <TrendingUp className="w-5 h-5" />, trend: { value: 1, isPositive: true }, description: undefined },
-          { title: 'Stock Alerts', value: alertCount, icon: <AlertCircle className="w-5 h-5" />, description: 'Active' },
-          { title: 'Damage Reports', value: damageCount, icon: <AlertTriangle className="w-5 h-5" />, trend: { value: 1, isPositive: false }, description: undefined },
-        ],
-        taskTable,
-      };
-    }
-
-    if (agentType === 'driver') {
-      // Driver KPIs: Today's Trips, KM Driven, Deliveries Completed, Pending PODs
-      const todayTrips = 4;
-      const kmDriven = 156;
-      const deliveries = 18;
-      const pendingPods = 2;
-
-      const taskTable = (
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4">Today's Trips</h3>
-          <div className="border border-[rgba(14,165,233,0.1)] rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader className="bg-[rgba(14,165,233,0.05)]">
-                <TableRow>
-                  <TableHead className="text-[#7dd3fc]">Trip ID</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Route</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Vehicle</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Departure</TableHead>
-                  <TableHead className="text-[#7dd3fc]">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[
-                  { id: 'TRIP-2025-0801', route: 'Mumbai - Pune', vehicle: 'MH-01-AB-4567', dept: '06:30 AM', status: 'In Progress' },
-                  { id: 'TRIP-2025-0802', route: 'Mumbai - Nagpur', vehicle: 'MH-02-CD-8901', dept: '07:15 AM', status: 'In Progress' },
-                  { id: 'TRIP-2025-0803', route: 'Mumbai - Nashik', vehicle: 'MH-03-EF-2345', dept: '08:00 AM', status: 'In Progress' },
-                  { id: 'TRIP-2025-0804', route: 'Mumbai - Aurangabad', vehicle: 'MH-04-GH-6789', dept: '08:45 AM', status: 'Pending' },
-                  { id: 'TRIP-2025-0800', route: 'Mumbai - Thane', vehicle: 'MH-05-IJ-0123', dept: '05:30 AM', status: 'Completed' },
-                ].map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-[#e0f2fe]">{row.id}</TableCell>
-                    <TableCell className="text-[rgba(148,163,184,0.8)]">{row.route}</TableCell>
-                    <TableCell className="text-[rgba(148,163,184,0.8)]">{row.vehicle}</TableCell>
-                    <TableCell className="text-[rgba(148,163,184,0.8)]">{row.dept}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(row.status)}>
-                        {row.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      );
-
-      return {
-        title: 'Driver Dashboard',
-        kpis: [
-          { title: "Today's Trips", value: todayTrips, icon: <Truck className="w-5 h-5" />, trend: { value: 1, isPositive: true }, description: undefined },
-          { title: 'KM Driven', value: `${kmDriven} km`, icon: <MapPin className="w-5 h-5" />, description: 'Active' },
-          { title: 'Deliveries Completed', value: deliveries, icon: <CheckCircle className="w-5 h-5" />, trend: { value: 5, isPositive: true }, description: undefined },
-          { title: 'Pending PODs', value: pendingPods, icon: <FileCheck className="w-5 h-5" />, trend: { value: 1, isPositive: false }, description: undefined },
-        ],
-        taskTable,
-      };
-    }
-
-    // Finance
-    const invoicesDue = 7;
-    const paymentsToday = 4;
-    const overdue = 2;
-    const reconciledPct = 94;
-
-    const taskTable = (
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold mb-4">Recent Invoices</h3>
-        <div className="border border-[rgba(14,165,233,0.1)] rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader className="bg-[rgba(14,165,233,0.05)]">
-              <TableRow>
-                <TableHead className="text-[#7dd3fc]">Invoice No.</TableHead>
-                <TableHead className="text-[#7dd3fc]">Customer</TableHead>
-                <TableHead className="text-[#7dd3fc]">Amount</TableHead>
-                <TableHead className="text-[#7dd3fc]">Due Date</TableHead>
-                <TableHead className="text-[#7dd3fc]">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[
-                { inv: 'INV-2025-001', customer: 'Tech Solutions', amt: '₹45,000', due: '2025-02-15', status: 'Paid' },
-                { inv: 'INV-2025-002', customer: 'Global Logistics', amt: '₹72,500', due: '2025-02-20', status: 'Unpaid' },
-                { inv: 'INV-2025-003', customer: 'Express Carriers', amt: '₹38,200', due: '2025-02-10', status: 'Overdue' },
-                { inv: 'INV-2025-004', customer: 'Prime Distribution', amt: '₹91,800', due: '2025-02-25', status: 'Unpaid' },
-                { inv: 'INV-2025-005', customer: 'Fast Forward Ltd', amt: '₹26,500', due: '2025-02-18', status: 'Pending' },
-              ].map((row) => (
-                <TableRow key={row.inv}>
-                  <TableCell className="text-[#e0f2fe]">{row.inv}</TableCell>
-                  <TableCell className="text-[rgba(148,163,184,0.8)]">{row.customer}</TableCell>
-                  <TableCell className="text-[rgba(148,163,184,0.8)]">{row.amt}</TableCell>
-                  <TableCell className="text-[rgba(148,163,184,0.8)]">{row.due}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(row.status)}>
-                      {row.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+  if (loading && !stats) {
+    return (
+      <PageWrapper title="Dashboard">
+        <LoadingState rows={12} message="Loading dashboard..." />
+      </PageWrapper>
     );
+  }
 
-    return {
-      title: 'Finance Dashboard',
-      kpis: [
-        { title: 'Invoices Due', value: invoicesDue, icon: <FileText className="w-5 h-5" />, trend: { value: 1, isPositive: true }, description: undefined },
-        { title: 'Payments Received', value: paymentsToday, icon: <CreditCard className="w-5 h-5" />, trend: { value: 2, isPositive: true }, description: undefined },
-        { title: 'Overdue Count', value: overdue, icon: <AlertCircle className="w-5 h-5" />, trend: { value: 1, isPositive: false }, description: undefined },
-        { title: 'Reconciled %', value: `${reconciledPct}%`, icon: <RefreshCcw className="w-5 h-5" />, trend: { value: 2, isPositive: true }, description: undefined },
-      ],
-      taskTable,
-    };
-  }, [agentType]);
+  if (error && !stats) {
+    return (
+      <PageWrapper title="Dashboard">
+        <EmptyState
+          icon={<AlertCircle className="w-8 h-8" />}
+          title="Failed to load dashboard"
+          description={error}
+          action={<Button variant="outline" size="sm" className="gap-1.5" onClick={fetchData}><RefreshCw className="w-3.5 h-3.5" /> Retry</Button>}
+        />
+      </PageWrapper>
+    );
+  }
 
   return (
-    <PageWrapper title={dashboardContent.title}>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {dashboardContent.kpis.map((kpi) => (
-          <KPICard
-            key={kpi.title}
-            title={kpi.title}
-            value={String(kpi.value)}
-            icon={kpi.icon}
-            trend={kpi.trend}
-            description={kpi.description}
-          />
-        ))}
-      </div>
+    <PageWrapper
+      title="Warehouse Dashboard"
+      description="Real-time overview of warehouse operations"
+      actions={
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-[0.65rem] text-muted-foreground">
+              Last updated: {formatDate(lastUpdated, 'datetime')}
+            </span>
+          )}
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+            Refresh
+          </Button>
+        </div>
+      }
+    >
+      {loading && <LoadingState rows={3} message="Refreshing..." />}
 
-      {dashboardContent.taskTable}
+      {!loading && stats && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
+            <KPICard title="GRNs Today" value={stats.grnsToday} icon={<Package className="w-5 h-5" />} iconColor="cyan" />
+            <KPICard title="Pending Outbound" value={stats.pendingOutbound} icon={<Truck className="w-5 h-5" />} iconColor="amber" />
+            <KPICard title="Inventory Value" value={formatCurrency(stats.inventoryValue)} icon={<DollarSign className="w-5 h-5" />} iconColor="green" />
+            <KPICard title="Stock Alerts" value={stats.stockAlerts} icon={<AlertCircle className="w-5 h-5" />} iconColor="red" />
+            <KPICard title="Damaged Goods" value={stats.damagedGoods} icon={<AlertTriangle className="w-5 h-5" />} iconColor="amber" />
+            <KPICard title="Active Shipments" value={stats.activeShipments} icon={<Box className="w-5 h-5" />} iconColor="indigo" />
+            <KPICard title="Space Utilization" value={`${stats.spaceUtilization}%`} icon={<Activity className="w-5 h-5" />} iconColor="teal" />
+            <KPICard title="Delayed Dispatches" value={stats.delayedDispatches} icon={<Clock className="w-5 h-5" />} iconColor="red" />
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-6">
+            <Button size="sm" className="gap-1.5"><Package className="w-4 h-4" /> New GRN</Button>
+            <Button size="sm" variant="outline" className="gap-1.5"><Truck className="w-4 h-4" /> New GDN</Button>
+            <Button size="sm" variant="outline" className="gap-1.5"><WarehouseIcon className="w-4 h-4" /> View Stock</Button>
+            <Button size="sm" variant="outline" className="gap-1.5"><BarChart3 className="w-4 h-4" /> Reports</Button>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2 space-y-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between py-4 px-5">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-cyan-400" />
+                    Recent GRNs
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                    View All <ArrowRight className="w-3 h-3" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="px-0 pb-0">
+                  {grns.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-muted-foreground">No GRNs found</div>
+                  ) : (
+                    <div className="divide-y divide-border/40">
+                      {grns.map((grn) => (
+                        <div key={grn.id} className="flex items-center justify-between px-5 py-3 hover:bg-muted/20 transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground truncate">{grn.grnId}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                              <span>{grn.vendor}</span>
+                              <span>·</span>
+                              <span>{grn.totalItems} items</span>
+                              <span>·</span>
+                              <span>{formatDate(grn.createdAt)}</span>
+                            </div>
+                          </div>
+                          <Badge className={cn('ml-3 text-[0.65rem] font-semibold', grnStatusColors[grn.status] || 'bg-gray-500/10 text-gray-400')}>
+                            {grn.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between py-4 px-5">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-amber-400" />
+                    Pending Outbound
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                    View All <ArrowRight className="w-3 h-3" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="px-0 pb-0">
+                  {gdns.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-muted-foreground">No outbound dispatches found</div>
+                  ) : (
+                    <div className="divide-y divide-border/40">
+                      {gdns.map((gdn) => (
+                        <div key={gdn.id} className="flex items-center justify-between px-5 py-3 hover:bg-muted/20 transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground truncate">{gdn.gdnId}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                              <span>{gdn.customer}</span>
+                              <span>·</span>
+                              <span>{gdn.totalItems} items</span>
+                              <span>·</span>
+                              <span>{formatDate(gdn.createdAt)}</span>
+                            </div>
+                          </div>
+                          <Badge className={cn('ml-3 text-[0.65rem] font-semibold', gdnStatusColors[gdn.status] || 'bg-gray-500/10 text-gray-400')}>
+                            {gdn.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between py-4 px-5">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    Stock Alerts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-0 pb-0">
+                  {notifications.filter((n) => n.type === 'Stock Alert').length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-muted-foreground">No stock alerts</div>
+                  ) : (
+                    <div className="divide-y divide-border/40">
+                      {notifications.filter((n) => n.type === 'Stock Alert').map((n) => (
+                        <div key={n.id} className="px-5 py-3 hover:bg-muted/20 transition-colors">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-foreground">{n.title}</p>
+                              <p className="text-[0.65rem] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between py-4 px-5">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-indigo-400" />
+                    Activity Feed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-0 pb-0">
+                  {activities.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-muted-foreground">No recent activity</div>
+                  ) : (
+                    <div className="divide-y divide-border/40">
+                      {activities.map((a) => {
+                        const Icon = a.icon;
+                        return (
+                          <div key={a.id} className="flex items-start gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+                            <div className={cn('mt-0.5', a.iconColor)}>
+                              <Icon className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-foreground truncate">{a.title}</p>
+                              <p className="text-[0.6rem] text-muted-foreground mt-0.5 line-clamp-1">{a.description}</p>
+                              <p className="text-[0.55rem] text-muted-foreground/60 mt-0.5">{formatDate(a.timestamp, 'datetime')}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between py-4 px-5">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-blue-400" />
+                    Notifications
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-0 pb-0">
+                  {notifications.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-muted-foreground">No notifications</div>
+                  ) : (
+                    <div className="divide-y divide-border/40">
+                      {notifications.map((n) => (
+                        <div key={n.id} className="flex items-start gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+                          <div className={cn('mt-0.5', n.severity === 'Critical' ? 'text-red-400' : n.severity === 'Warning' ? 'text-amber-400' : 'text-blue-400')}>
+                            <Bell className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-medium text-foreground truncate">{n.title}</p>
+                              <Badge className={cn('text-[0.55rem] px-1.5 py-0', notifSeverityColors[n.severity])}>{n.severity}</Badge>
+                            </div>
+                            <p className="text-[0.6rem] text-muted-foreground mt-0.5 line-clamp-1">{n.message}</p>
+                            <p className="text-[0.55rem] text-muted-foreground/60 mt-0.5">{formatDate(n.timestamp, 'datetime')}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </>
+      )}
     </PageWrapper>
   );
 }
