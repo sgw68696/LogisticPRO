@@ -1,48 +1,146 @@
 import { APP_CONFIG } from "@/config/appConfig";
 import { mockUsers, rolePermissions } from "@/data/mockData";
+import { mockDb } from "@/data/mock-db";
 import type { User, UserRole } from "@/types/user";
+import type { PaginatedResponse } from "@/data/mock-db";
 
 export interface UserFilters {
+  companyId?: string;
   role?: UserRole;
   status?: 'Active' | 'Inactive';
   search?: string;
+  sortBy?: 'name' | 'role' | 'status' | 'createdAt';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}
+
+function applyUserFilters(users: User[], filters?: UserFilters): User[] {
+  let result = [...users].map(u => ({ ...u, password: '' }));
+
+  if (filters?.companyId && filters.companyId !== 'all') {
+    result = result.filter((u: any) => u.companyId === filters!.companyId);
+  }
+
+  if (filters?.role) {
+    result = result.filter(u => u.role === filters!.role);
+  }
+
+  if (filters?.status) {
+    result = result.filter(u => u.status === filters!.status);
+  }
+
+  if (filters?.search) {
+    const q = filters.search.toLowerCase();
+    result = result.filter(u =>
+      u.name.toLowerCase().includes(q) ||
+      u.username.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    );
+  }
+
+  if (filters?.sortBy) {
+    const dir = filters.sortDir === 'asc' ? 1 : -1;
+    result.sort((a, b) => {
+      const aVal = (a as any)[filters!.sortBy!];
+      const bVal = (b as any)[filters!.sortBy!];
+      if (typeof aVal === 'string') {
+        return aVal.localeCompare(bVal) * dir;
+      }
+      return 0;
+    });
+  } else {
+    result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  return result;
 }
 
 export const userService = {
   async list(filters?: UserFilters): Promise<User[]> {
     if (APP_CONFIG.USE_MOCK) {
       await new Promise(resolve => setTimeout(resolve, 300));
-
-      let result = mockUsers.map(u => ({ ...u, password: '' }));
-
-      if (filters) {
-        if (filters.role) {
-          result = result.filter(u => u.role === filters.role);
-        }
-        if (filters.status) {
-          result = result.filter(u => u.status === filters.status);
-        }
-        if (filters.search) {
-          const search = filters.search.toLowerCase();
-          result = result.filter(u =>
-            u.name.toLowerCase().includes(search) ||
-            u.username.toLowerCase().includes(search) ||
-            u.email.toLowerCase().includes(search)
-          );
-        }
-      }
-
-      return result;
+      return applyUserFilters(mockUsers, filters);
     }
 
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
+        if (value) params.append(key, value as string);
       });
     }
 
     const response = await fetch(`${APP_CONFIG.API_BASE_URL}/users?${params}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+
+    return response.json();
+  },
+
+  async listPaginated(filters?: UserFilters): Promise<PaginatedResponse<User>> {
+    const page = filters?.page || 1;
+    const pageSize = filters?.pageSize || 20;
+
+    if (APP_CONFIG.USE_MOCK) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const filtered = applyUserFilters(mockUsers, filters);
+      return mockDb.paginate(filtered, page, pageSize);
+    }
+
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value as string);
+      });
+    }
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
+
+    const res = await fetch(`${APP_CONFIG.API_BASE_URL}/users?${params}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    return res.json();
+  },
+
+  async getStats(companyId?: string): Promise<{
+    total: number;
+    active: number;
+    inactive: number;
+    byRole: { role: string; count: number }[];
+    recentlyAdded: number;
+  }> {
+    if (APP_CONFIG.USE_MOCK) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      let users = [...mockUsers];
+      if (companyId && companyId !== 'all') {
+        users = users.filter((u: any) => u.companyId === companyId);
+      }
+
+      const roleCounts: Record<string, number> = {};
+      users.forEach(u => {
+        roleCounts[u.role] = (roleCounts[u.role] || 0) + 1;
+      });
+
+      const byRole = Object.entries(roleCounts)
+        .map(([role, count]) => ({ role, count }))
+        .sort((a, b) => b.count - a.count);
+
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+      return {
+        total: users.length,
+        active: users.filter(u => u.status === 'Active').length,
+        inactive: users.filter(u => u.status === 'Inactive').length,
+        byRole,
+        recentlyAdded: users.filter(u => new Date(u.createdAt) > oneWeekAgo).length,
+      };
+    }
+
+    const params = new URLSearchParams();
+    if (companyId) params.set('companyId', companyId);
+
+    const response = await fetch(`${APP_CONFIG.API_BASE_URL}/users/stats?${params}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 

@@ -1,43 +1,74 @@
 import { APP_CONFIG } from "@/config/appConfig";
 import { mockInvoices, mockAnalytics } from "@/data/mockData";
+import { mockDb } from "@/data/mock-db";
 import type { Invoice, InvoiceStatus } from "@/types/invoice";
+import type { PaginatedResponse } from "@/data/mock-db";
 
 export interface InvoiceFilters {
+  companyId?: string;
   status?: InvoiceStatus;
   customerId?: string;
   search?: string;
+  sortBy?: 'invoiceId' | 'customerName' | 'amount' | 'dueDate' | 'createdAt' | 'status';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}
+
+function applyInvoiceFilters(invoices: Invoice[], filters?: InvoiceFilters): Invoice[] {
+  let result = [...invoices];
+
+  if (filters?.companyId && filters.companyId !== 'all') {
+    result = result.filter((i: any) => i.companyId === filters!.companyId);
+  }
+
+  if (filters?.status) {
+    result = result.filter(i => i.status === filters!.status);
+  }
+
+  if (filters?.customerId) {
+    result = result.filter(i => i.customerId === filters!.customerId);
+  }
+
+  if (filters?.search) {
+    const q = filters.search.toLowerCase();
+    result = result.filter(i =>
+      i.invoiceId.toLowerCase().includes(q) ||
+      i.customerName.toLowerCase().includes(q)
+    );
+  }
+
+  if (filters?.sortBy) {
+    const dir = filters.sortDir === 'asc' ? 1 : -1;
+    result.sort((a, b) => {
+      const aVal = (a as any)[filters!.sortBy!];
+      const bVal = (b as any)[filters!.sortBy!];
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return aVal.localeCompare(bVal) * dir;
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return (aVal - bVal) * dir;
+      }
+      return 0;
+    });
+  } else {
+    result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  return result;
 }
 
 export const financeService = {
   async list(filters?: InvoiceFilters): Promise<Invoice[]> {
     if (APP_CONFIG.USE_MOCK) {
       await new Promise(resolve => setTimeout(resolve, 300));
-
-      let result = [...mockInvoices];
-
-      if (filters) {
-        if (filters.status) {
-          result = result.filter(i => i.status === filters.status);
-        }
-        if (filters.customerId) {
-          result = result.filter(i => i.customerId === filters.customerId);
-        }
-        if (filters.search) {
-          const search = filters.search.toLowerCase();
-          result = result.filter(i =>
-            i.invoiceId.toLowerCase().includes(search) ||
-            i.customerName.toLowerCase().includes(search)
-          );
-        }
-      }
-
-      return result;
+      return applyInvoiceFilters(mockInvoices, filters);
     }
 
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
+        if (value) params.append(key, value as string);
       });
     }
 
@@ -46,6 +77,31 @@ export const financeService = {
     });
 
     return response.json();
+  },
+
+  async listPaginated(filters?: InvoiceFilters): Promise<PaginatedResponse<Invoice>> {
+    const page = filters?.page || 1;
+    const pageSize = filters?.pageSize || 20;
+
+    if (APP_CONFIG.USE_MOCK) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const filtered = applyInvoiceFilters(mockInvoices, filters);
+      return mockDb.paginate(filtered, page, pageSize);
+    }
+
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value as string);
+      });
+    }
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
+
+    const res = await fetch(`${APP_CONFIG.API_BASE_URL}/invoices?${params}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    return res.json();
   },
 
   async getById(id: string): Promise<Invoice | null> {
@@ -178,6 +234,50 @@ export const financeService = {
     }
 
     const response = await fetch(`${APP_CONFIG.API_BASE_URL}/finance/expenses`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+
+    return response.json();
+  },
+
+  async getStats(companyId?: string): Promise<{
+    total: number;
+    totalAmount: number;
+    paid: number;
+    paidAmount: number;
+    unpaid: number;
+    overdue: number;
+    overdueAmount: number;
+    cancelled: number;
+  }> {
+    if (APP_CONFIG.USE_MOCK) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      let invoices = [...mockInvoices];
+      if (companyId && companyId !== 'all') {
+        invoices = invoices.filter((i: any) => i.companyId === companyId);
+      }
+
+      const paidInvoices = invoices.filter(i => i.status === 'Paid');
+      const unpaidInvoices = invoices.filter(i => i.status === 'Unpaid');
+      const overdueInvoices = invoices.filter(i => i.status === 'Overdue');
+      const cancelledInvoices = invoices.filter(i => i.status === 'Cancelled');
+
+      return {
+        total: invoices.length,
+        totalAmount: invoices.reduce((sum, i) => sum + i.amount, 0),
+        paid: paidInvoices.length,
+        paidAmount: paidInvoices.reduce((sum, i) => sum + i.amount, 0),
+        unpaid: unpaidInvoices.length,
+        overdue: overdueInvoices.length,
+        overdueAmount: overdueInvoices.reduce((sum, i) => sum + i.amount, 0),
+        cancelled: cancelledInvoices.length,
+      };
+    }
+
+    const params = new URLSearchParams();
+    if (companyId) params.set('companyId', companyId);
+
+    const response = await fetch(`${APP_CONFIG.API_BASE_URL}/finance/invoices/stats?${params}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 

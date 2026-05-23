@@ -4,6 +4,7 @@ import { companyAdminMenu } from '@/data/menu/company-admin-menu';
 import { COMPANY_TYPE_MENU_MAP, ENABLED_MODULES_BY_TYPE } from '@/data/company-type-menus';
 import type { MenuItem } from '@/components/layout/Sidebar/AppSidebar.types';
 import type { CompanyOperationalType } from '@/types/company-operational-types';
+import { Layers3 } from 'lucide-react';
 
 export interface FeatureFlags {
   enabledModules: string[];
@@ -21,16 +22,42 @@ export function useFeatureFlags(): FeatureFlags {
   }, [user]);
 }
 
-function mergeMenuItems(base: MenuItem[], extra: MenuItem[]): MenuItem[] {
+function createOperationsGroup(children: MenuItem[]): MenuItem | null {
+  if (children.length === 0) return null;
+
+  return {
+    id: 'operations',
+    label: 'Operations',
+    icon: Layers3,
+    description: 'Operational modules for enhanced company types',
+    children,
+  };
+}
+
+function mergeMenuItemsWithOperationsGroup(
+  base: MenuItem[],
+  extra: MenuItem[]
+): MenuItem[] {
+  if (extra.length === 0) return base;
+
   const existingIds = new Set(base.map((m) => m.id));
-  const merged = [...base];
-  for (const item of extra) {
-    if (!existingIds.has(item.id)) {
-      merged.push(item);
-      existingIds.add(item.id);
-    }
+  const filteredExtra = extra.filter((item) => !existingIds.has(item.id));
+
+  if (filteredExtra.length === 0) return base;
+
+  const operationsGroup = createOperationsGroup(filteredExtra);
+  if (!operationsGroup) return base;
+
+  const result = [...base];
+
+  const usersSettingsIndex = result.findIndex((m) => m.id === 'users-settings');
+  if (usersSettingsIndex !== -1) {
+    result.splice(usersSettingsIndex, 0, operationsGroup);
+  } else {
+    result.push(operationsGroup);
   }
-  return merged;
+
+  return result;
 }
 
 export function useAccessibleMenus(): MenuItem[] {
@@ -42,9 +69,8 @@ export function useAccessibleMenus(): MenuItem[] {
     const companyType = flags.companyType;
 
     const extraMenuItems = COMPANY_TYPE_MENU_MAP[companyType] ?? [];
-    const merged = mergeMenuItems(baseMenu, extraMenuItems);
+    const merged = mergeMenuItemsWithOperationsGroup(baseMenu, extraMenuItems);
 
-    // If user has assignedMenus, filter by them
     const assignedMenus = (user as any)?.assignedMenus as string[] | undefined;
     if (assignedMenus && assignedMenus.length > 0) {
       const allowedIds = new Set(assignedMenus);

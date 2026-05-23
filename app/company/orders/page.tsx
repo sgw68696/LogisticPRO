@@ -1,5 +1,7 @@
-import { CompanyDataPage } from '@/components/company/CompanyAdminPages';
+'use client';
+
+import { CompanyOrdersPage } from '@/components/company/CompanyOrdersPage';
 
 export default function OrdersPage() {
-  return <CompanyDataPage pageKey="orders" title="Orders" />;
+  return <CompanyOrdersPage />;
 }
