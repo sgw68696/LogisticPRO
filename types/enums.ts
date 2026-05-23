@@ -5,7 +5,7 @@ export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected'
 export type UserRole =
   | 'SuperAdmin' | 'CompanyAdmin' | 'Manager'
   | 'Dispatcher' | 'Operator' | 'Agent' | 'Staff'
-  | 'CustomsAgent' | 'PortAgent' | 'CustomerPortal' | 'AuditorReadOnly';
+  | 'Driver' | 'CustomsAgent' | 'PortAgent' | 'CustomerPortal' | 'AuditorReadOnly';
 
 export type AgentType = 'warehouse' | 'driver' | 'finance';
 

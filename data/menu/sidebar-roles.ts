@@ -45,6 +45,15 @@ export const operatorRoleConfig: SidebarRoleConfig = {
   accentColor: '#14b8a6',
 };
 
+export const driverRoleConfig: SidebarRoleConfig = {
+  roleLabel: 'Driver',
+  brandName: 'LogisticsPro',
+  brandHighlight: 'Pro',
+  logoSrc: '/LogisticsProLogo-bg.png',
+  homeHref: '/driver/dashboard',
+  accentColor: '#22c55e',
+};
+
 export const agentRoleConfig: SidebarRoleConfig = {
   roleLabel: 'Agent',
   brandName: 'LogisticsPro',

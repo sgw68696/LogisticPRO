@@ -134,6 +134,28 @@ export const PERMISSIONS: PermissionMatrix = {
     notifications: { view: true, create: false, edit: false, delete: false },
   },
 
+  Driver: {
+    companies: { view: false, create: false, edit: false, delete: false },
+    organizations: { view: false, create: false, edit: false, delete: false },
+    agents: { view: false, create: false, edit: false, delete: false },
+    transport: { view: false, create: false, edit: false, delete: false },
+    dashboard: { view: true, create: false, edit: false, delete: false },
+    shipments: { view: true, create: false, edit: true, delete: false },
+    orders: { view: true, create: false, edit: false, delete: false },
+    fleet: { view: false, create: false, edit: false, delete: false },
+    drivers: { view: true, create: false, edit: false, delete: false },
+    dispatch: { view: true, create: false, edit: false, delete: false },
+    warehouse: { view: false, create: false, edit: false, delete: false },
+    customers: { view: false, create: false, edit: false, delete: false },
+    finance: { view: true, create: false, edit: false, delete: false },
+    reports: { view: false, create: false, edit: false, delete: false },
+    users: { view: false, create: false, edit: false, delete: false },
+    settings: { view: false, create: false, edit: false, delete: false },
+    notifications: { view: true, create: false, edit: false, delete: false },
+    earnings: { view: true, create: false, edit: false, delete: false },
+    pod: { view: true, create: true, edit: false, delete: false },
+  },
+
   Staff: {
     companies: { view: false, create: false, edit: false, delete: false },
     organizations: { view: false, create: false, edit: false, delete: false },

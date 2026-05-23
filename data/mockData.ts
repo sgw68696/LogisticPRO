@@ -817,6 +817,7 @@ export const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
   Staff:           '/staff/dashboard',
   CustomsAgent:    '/customs/dashboard',
   PortAgent:       '/port/dashboard',
+  Driver:          '/driver/dashboard',
   CustomerPortal:  '/portal/dashboard',
   AuditorReadOnly: '/audit/dashboard',
 };
@@ -926,6 +927,15 @@ export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
     '/port/containers', '/port/manifests', '/port/cargo-log',
     '/port/charges', '/port/documents', '/port/reports', '/port/notifications',
   ],
+  Driver: [
+    '/driver/dashboard',
+    '/driver/trips',
+    '/driver/deliveries',
+    '/driver/pod',
+    '/driver/earnings',
+    '/driver/profile',
+    '/driver/notifications',
+  ],
   CustomerPortal: [
     '/portal/dashboard',
     '/portal/shipments', '/portal/tracking',
@@ -993,6 +1003,15 @@ export const mockUsers: MockUser[] = [
     avatar: 'MK', dashboardRoute: '/agent/dashboard',
     menuAccess: ROLE_MENU_ACCESS['Agent'],
     lastLogin: '2025-01-15T06:00:00Z', createdAt: '2024-05-20T00:00:00Z',
+  },
+  {
+    id: 'usr-016', name: 'Ramesh Kumar', username: 'driver', password: 'driver123',
+    email: 'ramesh.kumar@techlogistics.com', phone: '+91 98765 43230',
+    role: 'Driver', status: 'Active',
+    companyId: 'cmp-001', organizationId: null, agentId: null,
+    avatar: 'RK', dashboardRoute: '/driver/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['Driver'],
+    lastLogin: '2025-01-15T07:30:00Z', createdAt: '2024-09-01T00:00:00Z',
   },
   {
     id: 'usr-006', name: 'Ananya Gupta', username: 'finance', password: 'finance123',
