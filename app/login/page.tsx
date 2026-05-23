@@ -14,6 +14,7 @@ import { mockUsers, type UserRole } from '@/data/mockData';
 
 const roleBadgeVariants: Record<UserRole, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   SuperAdmin: 'destructive',
+  OrganizationAdmin: 'default',
   CompanyAdmin: 'default',
   Manager: 'default',
   Dispatcher: 'default',

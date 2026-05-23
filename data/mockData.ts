@@ -19,7 +19,7 @@ export type { BookingStatus, MilestoneStatus } from '@/types/enums';
 export type CompanyStatus = 'Active' | 'Pending' | 'Suspended' | 'Inactive';
 export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
 export type UserRole =
-  | 'SuperAdmin' | 'CompanyAdmin' | 'Manager'
+  | 'SuperAdmin' | 'OrganizationAdmin' | 'CompanyAdmin' | 'Manager'
   | 'Dispatcher' | 'Operator' | 'Agent' | 'Staff'
   | 'CustomsAgent' | 'PortAgent' | 'CustomerPortal' | 'AuditorReadOnly';
 export type AgentType = 'warehouse' | 'driver' | 'finance';
@@ -567,6 +567,7 @@ export interface MockUser {
   phone: string;
   role: UserRole;
   agentType?: AgentType;
+  companyType?: CompanyOperationalType;
   status: 'Active' | 'Inactive';
   companyId: string | null;
   organizationId: string | null;
@@ -574,6 +575,8 @@ export interface MockUser {
   avatar: string;
   dashboardRoute: string;
   menuAccess: string[];
+  assignedMenus?: string[];
+  assignedModules?: string[];
   lastLogin: string;
   createdAt: string;
 }
@@ -816,18 +819,19 @@ export const mockTransportItems: TransportItem[] = [
 ];
 
 export const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
-  SuperAdmin:      '/admin/dashboard',
-  CompanyAdmin:    '/company/dashboard',
-  Manager:         '/manager/dashboard',
-  Dispatcher:      '/ops/dashboard',
-  Operator:        '/ops/dashboard',
-  Agent:           '/agent/dashboard',
-  Staff:           '/staff/dashboard',
-  CustomsAgent:    '/customs/dashboard',
-  PortAgent:       '/port/dashboard',
-  Driver:          '/driver/dashboard',
-  CustomerPortal:  '/portal/dashboard',
-  AuditorReadOnly: '/audit/dashboard',
+  SuperAdmin:        '/admin/dashboard',
+  OrganizationAdmin: '/orgadmin/dashboard',
+  CompanyAdmin:      '/company/dashboard',
+  Manager:           '/manager/dashboard',
+  Dispatcher:        '/ops/dashboard',
+  Operator:          '/ops/dashboard',
+  Agent:             '/agent/dashboard',
+  Staff:             '/staff/dashboard',
+  CustomsAgent:      '/customs/dashboard',
+  PortAgent:         '/port/dashboard',
+  Driver:            '/driver/dashboard',
+  CustomerPortal:    '/portal/dashboard',
+  AuditorReadOnly:   '/audit/dashboard',
 };
 
 export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
@@ -851,6 +855,14 @@ export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
     '/admin/workflow/email-templates', '/admin/workflow/notification-templates', '/admin/workflow/document-types',
     '/admin/system/settings', '/admin/system/integrations', '/admin/system/api-config', '/admin/system/security',
     '/admin/audit/logs', '/admin/audit/error-logs', '/admin/audit/access-logs', '/admin/audit/system-activity',
+  ],
+  OrganizationAdmin: [
+    '/orgadmin/dashboard',
+    '/orgadmin/companies', '/orgadmin/companies/new',
+    '/orgadmin/companies/detail',
+    '/orgadmin/analytics',
+    '/orgadmin/users',
+    '/orgadmin/settings',
   ],
   CompanyAdmin: [
     '/company/dashboard',
@@ -1047,6 +1059,15 @@ export const mockUsers: MockUser[] = [
     avatar: 'VS', dashboardRoute: '/company/dashboard',
     menuAccess: ROLE_MENU_ACCESS['CompanyAdmin'],
     lastLogin: '2025-01-14T14:30:00Z', createdAt: '2024-08-01T00:00:00Z',
+  },
+  {
+    id: 'usr-015', name: 'Rajesh OrgAdmin', username: 'orgadmin', password: 'orgadmin123',
+    email: 'rajesh.org@globalgroup.com', phone: '+91 98765 43240',
+    role: 'OrganizationAdmin', status: 'Active', companyType: 'standard',
+    companyId: null, organizationId: 'org-001', agentId: null,
+    avatar: 'RO', dashboardRoute: '/orgadmin/dashboard',
+    menuAccess: ROLE_MENU_ACCESS['OrganizationAdmin'],
+    lastLogin: '2025-01-15T09:00:00Z', createdAt: '2024-11-01T00:00:00Z',
   },
   {
     id: 'usr-009', name: 'Rajesh Verma', username: 'operator01', password: 'operator123',

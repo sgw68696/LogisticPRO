@@ -3,7 +3,7 @@ export type CompanyStatus = 'Active' | 'Pending' | 'Suspended' | 'Inactive';
 export type RegistrationStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
 
 export type UserRole =
-  | 'SuperAdmin' | 'CompanyAdmin' | 'Manager'
+  | 'SuperAdmin' | 'OrganizationAdmin' | 'CompanyAdmin' | 'Manager'
   | 'Dispatcher' | 'Operator' | 'Agent' | 'Staff'
   | 'Driver' | 'CustomsAgent' | 'PortAgent' | 'CustomerPortal' | 'AuditorReadOnly';
 

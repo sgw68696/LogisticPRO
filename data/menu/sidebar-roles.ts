@@ -9,6 +9,11 @@ export const superAdminRoleConfig: SidebarRoleConfig = {
   accentColor: '#90EE90',
 };
 
+export const organizationAdminRoleConfig: SidebarRoleConfig = {
+  roleLabel: 'OrganizationAdmin', brandName: 'LogisticsPro', brandHighlight: 'Pro',
+  logoSrc: '/LogisticsProLogo-bg.png', homeHref: '/orgadmin/dashboard', accentColor: '#f59e0b',
+};
+
 export const companyAdminRoleConfig: SidebarRoleConfig = {
   roleLabel: 'CompanyAdmin',
   brandName: 'LogisticsPro',

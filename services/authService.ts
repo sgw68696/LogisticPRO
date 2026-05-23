@@ -26,6 +26,7 @@ export interface AuthResponse {
 
 const ROLE_SLUG_MAP: Record<string, UserRole> = {
   superadmin: 'SuperAdmin',
+  organizationadmin: 'OrganizationAdmin',
   companyadmin: 'CompanyAdmin',
   manager: 'Manager',
   dispatcher: 'Dispatcher',
@@ -65,6 +66,8 @@ const mapBackendUser = (backendUser: any): User => {
     avatar: backendUser.avatar || initials,
     dashboardRoute: ROLE_DASHBOARD_MAP[role] || '/login',
     menuAccess: [],
+    assignedMenus: backendUser.assignedMenus || undefined,
+    assignedModules: backendUser.assignedModules || undefined,
     lastLogin: backendUser.lastLoginAt || backendUser.last_login_at || new Date().toISOString(),
     createdAt: backendUser.createdAt || backendUser.created_at || new Date().toISOString(),
   };
